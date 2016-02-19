@@ -56,7 +56,7 @@ if not os.path.exists(args.save_location):
 	os.makedirs(args.save_location)
 
 # open log file
-f_log = open(args.log_file,'wb')
+f_log = open(args.log_file,'a')
 
 for n,coords in enumerate(data['results']):
 	mylong,mylat = coords
