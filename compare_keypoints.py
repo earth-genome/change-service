@@ -3,6 +3,7 @@ Compare SIFT and KAZE keypoints between two images.
 Arguments:
 - filename1: Image file
 - filename2: Filename to save results
+- filename3: Log file name
 """
 
 import argparse
@@ -25,6 +26,7 @@ kaze_color = (0,255,0)
 parser = argparse.ArgumentParser(description='Compare SIFT and KAZE keypoints.')
 parser.add_argument('image_filename', type=str, help='Image file name.')
 parser.add_argument('save_image_filename', type=str, help='Path to save output file.')
+parser.add_argument('log_file', type=str, help='Log file.')
 args = parser.parse_args()
 
 # load image files [note grayscale: 0; color: 1]
@@ -43,6 +45,13 @@ print 'Found {0} KAZE kps'.format(len(kps_kaze))
 print 'Found {0} SIFT kps'.format(len(kps_sift))
 
 # OUTPUT
+# log keypoint values
+f_log = open(args.log_file,'a')
+log_string = "{0}, {1}, {2}, {3}\n".format(args.image_filename,KAZE_PARAMETER,len(kps_kaze),len(kps_sift))
+f_log.write(log_string)
+f_log.close()
+		
+# build output image
 im_out = im_color.copy()
 cv2.drawKeypoints(im_out,kps_kaze,im_out,color=kaze_color,flags=0)
 cv2.drawKeypoints(im_out,kps_sift,im_out,color=sift_color,flags=0)

@@ -12,7 +12,7 @@ import json
 import os
 
 # params
-COUNTY_INDEX = 5
+COUNTY_INDEX = 33
 NUMBER_OF_LOCATIONS_PER_COUNTY = 4
 
 # api info
