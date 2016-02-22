@@ -1,5 +1,5 @@
 """ compare_keypoints.py
-Compare SIFT and KAZE keypoints between two images.
+Compare SIFT and KAZE keypoints in one image.
 Arguments:
 - filename1: Image file
 - filename2: Filename to save results

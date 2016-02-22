@@ -23,7 +23,7 @@ KAZE_PARAMETER = 0.0003                 	# empirical
 FLANN_KDTREE_INDEX = 0                  	# definition
 FLANN_TREE_NUMBER = 5                       # empirical
 FLANN_SEARCH_DEPTH = 50                 	# empirical
-IMAGE_WIDTH = 256                           # expected image width
+IMAGE_WIDTH = 512                           # expected image width
 
 def _gaussian(x,a,x0,sigma):
     # Defines a gaussian function for curve fitting
