@@ -16,8 +16,8 @@ from scipy.optimize import curve_fit
 
 # global parameters
 MATCH_PROXIMITY_IN_PIXELS = 4              # empirical
-#KAZE_PARAMETER = 0.0003                 	# empirical
-KAZE_PARAMETER = 0.001
+KAZE_PARAMETER = 0.0003                 	# empirical
+#KAZE_PARAMETER = 0.001
 FLANN_KDTREE_INDEX = 0                  	# definition
 FLANN_TREE_NUMBER = 5                       # empirical
 FLANN_SEARCH_DEPTH = 50                 	# empirical
@@ -148,18 +148,21 @@ KAZE = cv2.KAZE_create(threshold = KAZE_PARAMETER)
 index_parameters = dict(algorithm = FLANN_KDTREE_INDEX, trees = FLANN_TREE_NUMBER)
 search_parameters = dict(checks=FLANN_SEARCH_DEPTH)
 FLANN = cv2.FlannBasedMatcher(index_parameters,search_parameters)
+AKAZE = cv2.AKAZE_create(threshold= KAZE_PARAMETER)
 
 # find keypints and descriptors
 #kps1,desc1 = SIFT.detectAndCompute(im1,None)
 #kps2,desc2 = SIFT.detectAndCompute(im2,None)
-kps1,desc1 = KAZE.detectAndCompute(im1,None)
-kps2,desc2 = KAZE.detectAndCompute(im2,None)
+#kps1,desc1 = KAZE.detectAndCompute(im1,None)
+#kps2,desc2 = KAZE.detectAndCompute(im2,None)
+kps1,desc1 = AKAZE.detectAndCompute(im1,None)
+kps2,desc2 = AKAZE.detectAndCompute(im2,None)
 print 'Found {0} kps in im1'.format(len(kps1))
 print 'Found {0} kps in im2'.format(len(kps2))
 
 # find 2-way matches
-match_candidates = FLANN.match(desc1,desc2)
-#match_candidates = BFMATCH.match(desc1,desc2)
+#match_candidates = FLANN.match(desc1,desc2)
+match_candidates = BFMATCH.match(desc1,desc2)
 print 'Found {0} match candidates...'.format(len(match_candidates))
 
 # do proximity test
@@ -218,7 +221,7 @@ cv2.putText(text_box,label_string,label_origin,1,1.0,black_color)
 label_string = "Matched keypoints: {0}".format(len(kps2_matched))
 label_origin = (20,60)
 cv2.putText(text_box,label_string,label_origin,1,1.0,match_color)
-label_string = "KAZE (0.001); proximity test @ {0} pixels; FLANN".format(MATCH_PROXIMITY_IN_PIXELS)
+label_string = "AKAZE (0.0003); proximity test @ {0} pixels; BFMATCH".format(MATCH_PROXIMITY_IN_PIXELS)
 label_origin = (20,80)
 cv2.putText(text_box,label_string,label_origin,1,1.0,black_color)
 
