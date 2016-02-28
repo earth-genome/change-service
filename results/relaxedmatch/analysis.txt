@@ -1,0 +1,26 @@
+
+Tests 2/27/16 using relaxed_match.py.
+
+Prior to geometric filtering, the criteria for match proposals can be tightened or relaxed.  I wanted to look into these possibilities while implementing the proximity test.
+
+The analysis below is subjective in that I am validating the final output matches by visual inspection -- if the circles line up over the same feature in the two images, I consider the match valid.  The test scenes are Colin's Modoc 002, San Diego 001, and Oakland 002.  For Modoc 002 there are few enough match points that I can quantify my impressions to some extent.  The baseline for comparisons is the BFMatcher with default settings.  
+
+1)  We could tighten by adding the CrossCheck.  This results in about a 10% reduction in match rate for these three scenes.  Many of the lost matches seem valid.  For Modoc, SIFT, this is a reduction from 13 -> 11. You lose two valid matches but gain two others.  (The difference of two I can't account for visually, because some keypoints have identical coordinates (with different descriptors).)
+
+How do you gain matches with CrossCheck?  As best I can interpret the Open CV docs, you shouldn't.  A change in the proximity test is the only thing I can think, but as best I can read your code, Colin, the hard 4-pixel cutoff is currently set.  
+
+For Modoc, KAZE, you lose 51 -> 37, and those lost look like solid matches.
+
+2) On the flip side, we could relax the initial match criterion by using the kNN matcher and then asking, in order, which if any of the top k matches meet the proximity test.  
+
+a) k = 2. For Modoc, SIFT, the matches increase from 13->20.  I count four additional valid matches and one invalid match (with the other two presumably having identical coordinates as existing matches, and more likely than not, valid.)  
+
+For Modoc, KAZE, the matches only increase 51 -> 58, but the added points look solid.
+
+b) k = 5.  For Modoc, SIFT, the number of matches has increased 20->34 above k=2.  Of those, 3 of the additional matches look invalid.
+
+For Modoc, KAZE, about half of the additional matches (as compared to k=2) look invalid.
+
+For Oakland and SD, which have much higher match rates to begin with, you get successive ~10% bumps moving to k=2, then k=5, and the new points look good in similar proportion to Modoc.  
+
+Tentative conclusion:  Relaxing the match criterion to k=2 seems to merit further exploration in the change algo but is not mission critical.
