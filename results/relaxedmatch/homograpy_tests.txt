@@ -1,11 +1,27 @@
 
 2/27/16 tests of homography transformations using homography_match.py.
 
-As I understand now, Dellinger et al. are using a BFMatcher() or analogous and then using a RANSAC-estimated affine transform to filter their match candidates.  So this is very much like what we're doing, but with an affine transformation instead of proximity test.
+As I understand now, Dellinger et al. are using a BFMatcher() or
+analogous and then using a RANSAC-estimated affine transform to filter
+their match candidates.  So this is very much like what we're doing,
+but with an affine transformation instead of proximity test.
 
-Open CV offers full homography transformation functionality.  Before testing, I had thought that the homography transform would be a stricter filter than proximity, but we might still argue for the latter as more in line with the spirit of the KAZE features, namely, allowing some room for nonlinear deformations between images.   
+ Open CV offers full homography transformation functionality.  Before
+ testing, I had thought that the homography transform would be a
+ stricter filter than proximity, but we might still argue for the
+ latter as more in line with the spirit of the KAZE features, namely,
+ allowing some room for nonlinear deformations between images.
 
-I created homography_match.py, a hack of match_keypoints.py, with the idea of implementing a homography filter.  First I just asked it to compute homography transforms and check how close points were to their matches after the transform.  Averaging across matches that meet the proximity test, the average distance between matched keypoints is actually greater after the homography transform than before.  
+I created homography_match.py, a hack of match_keypoints.py, with the
+idea of implementing a homography filter.  First I just asked it to
+compute homography transforms and check how close points were to their
+matches after the transform.  The computed homography transformations
+are, in fact, affine.  (In general, homography includes affine
+transformations plus an additional two possible
+degrees of freedom for projection.)  Averaging across matches that
+meet the proximity test, the average distance between matched
+keypoints is actually greater after the homography transform than
+before.
 
 San Diego 001:
 avg post-homography distance: 1.81000686284
@@ -24,7 +40,10 @@ avg post-homography distance: 292.587670951
 
 avg distance: 1.61165734563
 
-RANSAC fails for Modoc because there are so few candidate matches with good proximity. I tried to estimate the homography transform solely on the points that passed our proximity test -- Modoc did much better in this case but the trend is the same:
+RANSAC fails for Modoc because there are so few candidate matches with
+good proximity. I tried to estimate the homography transform solely on
+the points that passed our proximity test -- Modoc did much better in
+this case but the trend is the same:
 
 San Diego 001:
 
@@ -44,9 +63,24 @@ avg post-homography distance: 3.18598966033
 
 avg distance: 1.61165734563
 
-The estimated homography transformations include slight rotations along with translation, and therein lies the additional error.  We could try estimateAffine3d with null 3rd coordinates to search for affine-only transformations and see what happens.  (This is the only candidate I see in Open CV that offers RANSAC estimation.)  
+Do either of you know whether there is an easy way in OpenCV to do
+RANSAC estimation of a translation-only transformation?  That might be
+worth trying.
 
-Conclusion:  For imagery with this degree of consistency in registration, a proximity test introduces less uncertainty than would a test based on estimated homography transformations.
+Tentative conclusion: For imagery with this degree of consistency in
+registration, a proximity test introduces less uncertainty than would
+a test based on estimated affine transformations.  Said another way,
+for a given neighborhood size, we can expect to capture more good
+matches with a proximity test as compared to an affine
+transformation. This seems a good use of our special domain knowledge
+and a potential talking point for the paper.  We might test on images
+with more nonlinear deformation to see if it bolsters this case.  
+
+To keep the framing consistent, I will go ahead and write the
+homography filter so we can compare match rates against those of the
+proximity test for the same neighborhood size. If you want to play
+with this, the full output including homography matrices is here, and
+the (hacky) code is uploaded as well.
 
 The full output of these tests, including the homography matrices, follows:
 
