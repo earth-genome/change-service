@@ -1,0 +1,120 @@
+
+2/27/16 tests of homography transformations using homography_match.py.
+
+As I understand now, Dellinger et al. are using a BFMatcher() or analogous and then using a RANSAC-estimated affine transform to filter their match candidates.  So this is very much like what we're doing, but with an affine transformation instead of proximity test.
+
+Open CV offers full homography transformation functionality.  Before testing, I had thought that the homography transform would be a stricter filter than proximity, but we might still argue for the latter as more in line with the spirit of the KAZE features, namely, allowing some room for nonlinear deformations between images.   
+
+I created homography_match.py, a hack of match_keypoints.py, with the idea of implementing a homography filter.  First I just asked it to compute homography transforms and check how close points were to their matches after the transform.  Averaging across matches that meet the proximity test, the average distance between matched keypoints is actually greater after the homography transform than before.  
+
+San Diego 001:
+avg post-homography distance: 1.81000686284
+
+avg distance: 1.37646913837
+
+Oakland 002:
+
+avg post-homography distance: 1.76300378111
+
+avg distance: 1.385800802
+
+Modoc 002:
+
+avg post-homography distance: 292.587670951
+
+avg distance: 1.61165734563
+
+RANSAC fails for Modoc because there are so few candidate matches with good proximity. I tried to estimate the homography transform solely on the points that passed our proximity test -- Modoc did much better in this case but the trend is the same:
+
+San Diego 001:
+
+avg post-homography distance: 2.04366751703
+
+avg distance: 1.37646913837
+
+Oakland 002:
+
+avg post-homography distance: 1.47217684008
+
+avg distance: 1.385800802
+
+Modoc 002:
+
+avg post-homography distance: 3.18598966033
+
+avg distance: 1.61165734563
+
+The estimated homography transformations include slight rotations along with translation, and therein lies the additional error.  We could try estimateAffine3d with null 3rd coordinates to search for affine-only transformations and see what happens.  (This is the only candidate I see in Open CV that offers RANSAC estimation.)  
+
+Conclusion:  For imagery with this degree of consistency in registration, a proximity test introduces less uncertainty than would a test based on estimated homography transformations.
+
+The full output of these tests, including the homography matrices, follows:
+
+zu:~/Desktop/SatelliteVX/image-service/$python homography_match.py imagery/modoc002-2012.jpg imagery/modoc002-2010.jpg modoc002-KAZE-homog.jpg modoc002-2012 modoc002-2010
+Found 1175 kps in im1
+Found 640 kps in im2
+Found 1175 match candidates...
+...of which 51 are within the proximity limit of 4 pixels.
+Estimated homography transformation:
+[[ -7.85888379e-03  -2.72666779e-02   1.15017827e+01]
+ [ -9.45845486e-02  -2.98904053e-01   1.29736853e+02]
+ [ -7.31373320e-04  -2.30008691e-03   1.00000000e+00]]
+avg post-homography distance: 292.587670951
+avg distance: 1.61165734563
+zu:~/Desktop/SatelliteVX/image-service/$python homography_match.py imagery/oakland002-2012.jpg imagery/oakland002-2010.jpg oakland002-KAZE-homog.jpg oakland002-2012 oakland002-2010
+Found 4351 kps in im1
+Found 3310 kps in im2
+Found 4351 match candidates...
+...of which 1356 are within the proximity limit of 4 pixels.
+Estimated homography transformation:
+[[  1.00493362e+00  -4.22763547e-04  -5.01136148e-01]
+ [  6.05053344e-04   1.00278307e+00   3.28847683e-01]
+ [  5.95513096e-06   4.95597977e-06   1.00000000e+00]]
+avg post-homography distance: 1.76300378111
+avg distance: 1.385800802
+zu:~/Desktop/SatelliteVX/image-service/$python homography_match.py imagery/sandiego001-2012.jpg imagery/sandiego001-2010.jpg sandiego001-KAZE-homog.jpg sandiego001-2012 sandiego001-2010
+Found 4460 kps in im1
+Found 2935 kps in im2
+Found 4460 match candidates...
+...of which 1706 are within the proximity limit of 4 pixels.
+Estimated homography transformation:
+[[  1.00373117e+00   3.04063935e-03  -8.76381722e-01]
+ [  8.35064812e-04   1.00388373e+00  -3.72173646e-01]
+ [  2.76530357e-06   8.06314077e-06   1.00000000e+00]]
+avg post-homography distance: 1.81000686284
+avg distance: 1.37646913837
+
+zu:~/Desktop/SatelliteVX/image-service/$python homography_match.py imagery/modoc002-2012.jpg imagery/modoc002-2010.jpg modoc002-KAZE-homog.jpg modoc002-2012 modoc002-2010
+Found 1175 kps in im1
+Found 640 kps in im2
+Found 1175 match candidates...
+...of which 51 are within the proximity limit of 4 pixels.
+Estimated homography transformation:
+[[  1.01875914e+00   1.37732414e-02  -4.35062540e+00]
+ [  4.95970331e-03   1.01652866e+00  -1.61478765e+00]
+ [  6.33437634e-06   4.38405476e-05   1.00000000e+00]]
+avg post-homography distance: 3.18598966033
+avg distance: 1.61165734563
+zu:~/Desktop/SatelliteVX/image-service/$python homography_match.py imagery/oakland002-2012.jpg imagery/oakland002-2010.jpg oakland002-KAZE-homog.jpg oakland002-2012 oakland002-2010
+Found 4351 kps in im1
+Found 3310 kps in im2
+Found 4351 match candidates...
+...of which 1356 are within the proximity limit of 4 pixels.
+Estimated homography transformation:
+[[  1.00262926e+00  -3.06458515e-04  -2.42366320e-01]
+ [  4.50467749e-04   1.00155597e+00   3.00843301e-01]
+ [  3.31954811e-06   2.98697434e-06   1.00000000e+00]]
+avg post-homography distance: 1.47217684008
+avg distance: 1.385800802
+zu:~/Desktop/SatelliteVX/image-service/$python homography_match.py imagery/sandiego001-2012.jpg imagery/sandiego001-2010.jpg sandiego001-KAZE-homog.jpg sandiego001-2012 sandiego001-2010
+Found 4460 kps in im1
+Found 2935 kps in im2
+Found 4460 match candidates...
+...of which 1706 are within the proximity limit of 4 pixels.
+Estimated homography transformation:
+[[  1.00569121e+00   2.90435929e-03  -1.08089885e+00]
+ [  1.11667852e-03   1.00434506e+00  -3.98086948e-01]
+ [  5.84898914e-06   8.00921811e-06   1.00000000e+00]]
+avg post-homography distance: 2.04366751703
+avg distance: 1.37646913837
+zu:~/Desktop/SatelliteVX/image-service/$open ../research/flora-SIFTchangedectection.pdf 
