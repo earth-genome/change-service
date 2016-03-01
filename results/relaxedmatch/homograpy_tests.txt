@@ -151,4 +151,32 @@ Estimated homography transformation:
  [  5.84898914e-06   8.00921811e-06   1.00000000e+00]]
 avg post-homography distance: 2.04366751703
 avg distance: 1.37646913837
-zu:~/Desktop/SatelliteVX/image-service/$open ../research/flora-SIFTchangedectection.pdf 
+zu:~/Desktop/SatelliteVX/image-service/$open
+../research/flora-SIFTchangedectection.pdf
+
+---
+
+Follow up 2/29 on match rates:
+
+
+To follow through on the homography testing:  
+
+I am comparing the match rates for BFdefault using either the proximity test or the homography transform plus proximity test (post transform).  
+
+With MATCH_PROXIMITY_IN_PIXELS=4:
+
+I get basically identical match rates for the two.
+
+SanDiego:  1706 (proximity only) vs. 1687 (with homography)
+Oakland: 1357 (proximity only) vs. 1356 (with homography)
+Modoc: homography fails (for reasons noted in prev. email)
+
+With MATCH_PROXIMITY_IN_PIXELS=2:
+
+Now we see a ~20% difference:
+
+SanDiego:  1331 (proximity only) vs. 1074 (with homography)
+Oakland: 1056 (proximity only) vs. 851 (with homography)
+
+Conclusion:  Homography introduces uncertainty into the proximity filtering, unncessarily.
+

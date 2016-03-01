@@ -119,6 +119,28 @@ def _calculate_proximity_threshold(offsets,num_sigma=3):
     popt,pcov = curve_fit(_gaussian,xdat,offsets,[a_guess,x0_guess,sigma_guess])
     return int(popt[1] + num_sigma * popt[2])
 
+def _count_close_knearest(kNNmatchlist,kps1,kps2,
+                          radius=MATCH_PROXIMITY_IN_PIXELS):
+    """Determine how many of the top-k match candidates fall within
+    radius of the associated feature.
+    """
+    count = sum([_are_close(kps1[m.queryIdx],kps2[m.trainIdx],radius)
+                 for m in kNNmatchlist])
+    return count
+
+def _avg_close_knearest(match_cands,kps1,kps2,
+                        radius=MATCH_PROXIMITY_IN_PIXELS):
+    """Across a list of match candidates, determine the average number
+    that fall within radius of their associated feature. 
+    """
+    count = 0
+    non_empty_nbhds = 0
+    for mlist in match_cands:
+        num_close = _count_close_knearest(mlist,kps1,kps2,radius)
+        if num_close > 0:
+            count += num_close
+            non_empty_nbhds += 1
+    return count/float(non_empty_nbhds)
 
 # main
 
@@ -163,28 +185,32 @@ print 'Found {0} kps in im2'.format(len(kps2))
 
 # find 2-way matches
 #match_candidates = FLANN.match(desc1,desc2)
-#match_candidates = BFMATCH.match(desc1,desc2)
+match_candidates = BFMATCH.match(desc1,desc2)
 # Use this instead for relaxed matching:
-match_candidates = BFMATCH.knnMatch(desc1,desc2,k=KNEAREST)
+#match_candidates = BFMATCH.knnMatch(desc1,desc2,k=KNEAREST)
 print 'Found {0} match candidates...'.format(len(match_candidates))
 
 # do proximity test
 #match_offsets = _calculate_offsets_between_matches(kps1,kps2,match_candidates)
 #proximity_in_pixels = _calculate_proximity_threshold(match_offsets)
 #MATCH_PROXIMITY_IN_PIXELS = proximity_in_pixels
-#matches = [
-#	m for m in match_candidates if _are_close(kps1[m.queryIdx],kps2[m.trainIdx],MATCH_PROXIMITY_IN_PIXELS)
-#]
+matches = [
+	m for m in match_candidates if _are_close(kps1[m.queryIdx],kps2[m.trainIdx],MATCH_PROXIMITY_IN_PIXELS)
+]
 # For relaxed matching, look through top KNEAREST match candidates in order
 # seeking one that passes the proximity test: 
-matches = []
-for knnlist in match_candidates:
-    for m in knnlist:
-        if _are_close(kps1[m.queryIdx],kps2[m.trainIdx],
-                      MATCH_PROXIMITY_IN_PIXELS):
-            matches.append(m)
-            break
-match_candidates = [m for knnlist in match_candidates for m in knnlist]
+#matches = []
+#for knnlist in match_candidates:
+#    for m in knnlist:
+#        if _are_close(kps1[m.queryIdx],kps2[m.trainIdx],
+#                      MATCH_PROXIMITY_IN_PIXELS):
+#            matches.append(m)
+#            break
+#avg_close = _avg_close_knearest(match_candidates,kps1,kps2)
+#print 'K: {}, radius: {}, avg match candidates within radius: {}'.format(
+#    KNEAREST,MATCH_PROXIMITY_IN_PIXELS,avg_close)
+#match_candidates = [m for knnlist in match_candidates for m in knnlist]
+
 print '...of which {0} are within the proximity limit of {1} pixels.'.format(len(matches),MATCH_PROXIMITY_IN_PIXELS)
 #for m in matches:
 #    print kps1[m.queryIdx].pt[0],kps1[m.queryIdx].pt[1],desc1[m.queryIdx]

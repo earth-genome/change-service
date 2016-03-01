@@ -23,7 +23,7 @@ FLANN_TREE_NUMBER = 5                       # empirical
 FLANN_SEARCH_DEPTH = 50                 	# empirical
 KNEAREST = 2 # For relaxed matching, proximity test the KNEAREST matches 
 IMAGE_WIDTH = 512                           # expected image width
-HOMOGRAPHY_UNCERTAINTY = 2.5
+
 
 def _gaussian(x,a,x0,sigma):
     # Defines a gaussian function for curve fitting
@@ -121,14 +121,20 @@ def _calculate_proximity_threshold(offsets,num_sigma=3):
     return int(popt[1] + num_sigma * popt[2])
 
 def _calculate_homography(matches,kp1,kp2):
-        src_pts = np.float32([kp1[m.queryIdx].pt
+    """Determine the optimal homography transform between matches
+    using a RANSAC-based estimator.
+    """
+    src_pts = np.float32([kp1[m.queryIdx].pt
                               for m in matches]).reshape(-1,1,2)
-        dst_pts = np.float32([kp2[m.trainIdx].pt
+    dst_pts = np.float32([kp2[m.trainIdx].pt
                               for m in matches]).reshape(-1,1,2)
-        H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC,5.0)
-        return H, mask
+    H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC,5.0)
+    return H, mask
 
 def _homography_distance(pt1,pt2,H):
+    """After applying homography transform H to pt1, determine its
+    distance from pt2.
+    """ 
     # augmented coordinates
     aug1 = np.array((pt1[0],pt1[1],1))
     aug2 = np.array((pt2[0],pt2[1],1))
@@ -136,12 +142,16 @@ def _homography_distance(pt1,pt2,H):
     return dist
 
 def _compute_distance(pt1,pt2):
+    """Compute the L2 distance between pt1 and pt2."""
     dist = np.linalg.norm(np.array(pt1)-np.array(pt2))
     return dist
 
-def _check_homography(pt1,pt2,H,epsilon):
+def _check_homography(pt1,pt2,H,radius=MATCH_PROXIMITY_IN_PIXELS):
+    """Determine whether the homography transform H on pt1 is within
+    the given radius of pt2.
+    """
     dist = _homography_distance(pt1,pt2,H)
-    if dist < epsilon:
+    if dist < radius:
         return True
     else:
         return False
@@ -198,9 +208,9 @@ print 'Found {0} match candidates...'.format(len(match_candidates))
 #match_offsets = _calculate_offsets_between_matches(kps1,kps2,match_candidates)
 #proximity_in_pixels = _calculate_proximity_threshold(match_offsets)
 #MATCH_PROXIMITY_IN_PIXELS = proximity_in_pixels
-matches = [
-	m for m in match_candidates if _are_close(kps1[m.queryIdx],kps2[m.trainIdx],MATCH_PROXIMITY_IN_PIXELS)
-]
+#matches = [
+#	m for m in match_candidates if _are_close(kps1[m.queryIdx],kps2[m.trainIdx],MATCH_PROXIMITY_IN_PIXELS)
+#]
   
 # For relaxed matching, look through top KNEAREST match candidates in order
 # seeking one that passes the proximity test: 
@@ -212,8 +222,6 @@ matches = [
 #            matches.append(m)
 #            break
 #match_candidates = [m for knnlist in match_candidates for m in knnlist]
-print '...of which {0} are within the proximity limit of {1} pixels.'.format(len(matches),MATCH_PROXIMITY_IN_PIXELS)
-
 
 # homography filter
 H, mask = _calculate_homography(match_candidates,kps1,kps2)
@@ -221,15 +229,20 @@ print 'Estimated homography transformation:'
 print H
 # work in progress:  for now simply print average residual distance between
 # matched points with and without homography transform
-notransdist, homogdist = 0,0
-for m in matches:
-    notransdist += _compute_distance(kps1[m.queryIdx].pt,
-                    kps2[m.trainIdx].pt)
-    homogdist += _homography_distance(kps1[m.queryIdx].pt,
-                    kps2[m.trainIdx].pt,H)
-print 'avg post-homography distance: {0}'.format(homogdist/len(matches))
-print 'avg distance: {0}'.format(notransdist/len(matches))
-#matches = [m for m in matches if _check_homography(kps1[m.queryIdx].pt,kps2[m.trainIdx].pt,H)
+#notransdist, homogdist = 0,0
+#for m in matches:
+#    notransdist += _compute_distance(kps1[m.queryIdx].pt,
+#                    kps2[m.trainIdx].pt)
+#    homogdist += _homography_distance(kps1[m.queryIdx].pt,
+#                    kps2[m.trainIdx].pt,H)
+#print 'avg post-homography distance: {0}'.format(homogdist/len(matches))
+#print 'avg distance: {0}'.format(notransdist/len(matches))
+matches = [m for m in match_candidates if _check_homography(
+    kps1[m.queryIdx].pt,kps2[m.trainIdx].pt,H)]
+print '...of which {0} are within the proximity limit of {1} pixels.'.format(
+    len(matches),MATCH_PROXIMITY_IN_PIXELS)
+print 'match rate: {}'.format(float(len(matches))/len(match_candidates))
+
   
 #for m in matches:
 #    print kps1[m.queryIdx].pt[0],kps1[m.queryIdx].pt[1],desc1[m.queryIdx]
