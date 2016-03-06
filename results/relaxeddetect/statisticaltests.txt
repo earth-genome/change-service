@@ -1,0 +1,48 @@
+I'm reporting here on another outstanding question, this time regarding the statistical test.  If you want to go back and look, some of this is introduced in the email thread with subject heading "10^-6".   The main question is:  Why do Dellinger et al. derive the binomial distribution based on the distribution of matches and then go looking for anomalously large numbers of keypoints on a neighborhood?  Wouldn't it make more sense to do it the other way around?  The main results are below the line (--- --- ---).  First I review the three different statistical tests at play here:
+
+Intuitively, the statistical test should work as follows:  You see how many keypoints are in the local neighborhood of a change point, as a fraction of the total keypoints in the image.  This ratio gives you the probability p defining the intensity of the binomial process on that local neighborhood. Then, given a total number of matches in the image, you use the binomial distribution to estimate how many matches you should see in the neighborhood.  If the number of matches is much lower than expected, you flag the point for change.  
+
+I'm going to call this option "pbykprate," i.e.,  the keypoints determine the p. The call is 
+    local_kp_rate = len(local_kps)/float(N_kps2)  # this is p
+    if scipy.stats.binom.cdf(len(local_matches),N_matches,
+                    local_kp_rate) < MATCH_PROBABILITY_THRESHOLD:
+        kps2_changed.append(kp)
+
+The CDF is the appropriate function to use because we are thresholding the probability of finding the actual number of matches or fewer on the neighborhood, although, in the tail of the distribution the cdf and pmf are not very different.
+
+However, Dellinger et al do it backwards.  They instead define a binomial distribution based on the number of matches on the neighborhood as compared to the total number of matches on the image, i.e. the probability p is the local matches divided by total matches.  Then they use this distribution to estimate the total number of keypoints in the neighborhood.  If the number of keypoints is much greater than expected, you flag the neighborhood for change.
+
+I'm going to call this option "pbymatchrate," i.e.,  the matches determine the p. The call is 
+    local_match_rate = len(local_matches)/float(N_matches)  # this is p
+    if scipy.stats.binom.sf(len(local_kps),N_kps2,
+                    local_match_rate) < MATCH_PROBABILITY_THRESHOLD:
+        kps2_changed.append(kp)
+
+In this case the sf is the appropriate function to use because we are thresholding the probability of finding the actual number of kepoints or greater on the neighborhood, although again, in the tail of the distribution the sf and pmf are not that different.
+
+In the detect_change.py file, a third statistical test is being used, which takes p as the overall match rate, i.e. the total number of matches divided by the total number of keypoints on the image.  The statistical test then asks whether, given the number of keypoints on a neighborhood, we find the expected number of matches.
+
+I've called this option "matchkpratio."  The call is
+
+match_rate_2 = N_matches/float(N_kps2)   # this is p
+...
+    if scipy.stats.binom.pmf(len(local_matches),len(local_kps),match_rate_2) < MATCH_PROBABILITY_THRESHOLD:
+        kps2_changed.append(kp)
+
+I'm not sure when this option came in.  It has it's own logic that seems sound, but it is different logic than the first two.  The first models the appearance of matches on a neighborhood as a subset (sampling?) of all (binomial distributed) matches across the image.  The second does the same but with keypoints.  The third models the appearance of matches on the neighborhood as a (binomial distributed) subset of keypoints on the neighborhood.  
+
+In any case, the third gives qualitatively different results from the first two.   Compare, e.g. Candlestick C with B, the latter being the Dellinger et al standard.  Or compare CalAcad C with B.   
+
+(All outputs referenced here are in the matchplay branch in the results/relaxeddetect directory.  Apologies for uploading so many images.)
+
+--- --- --- 
+
+My main goal here was to compare the first, more intuitive approach (pbykpratio) with that of Dellinger et al. (pbymatchratio).  The natural thresholds are different for the two approaches, but roughly, a threshold of .005 for pbykpratio gives a similar number of change points to the 10^-6 of bymatchratio.  Qualitatively the results are quite similar.  Compare Candlestick A and B, CalAcad A and B.   RioVista is somewhat of an exception here, presumably due to the very low number of matches.
+
+As you dial down the thresholds, something interesting happens:  For the same number of orders of magnitude, the pbykpratio test is much more responsive to reductions in threshold than is the pbymatchratio.  This is a virtue for us, because I think we're going to want to detect less change than we are currently.  I don't understand why, but I haven't given it too much thought.  Nor have I tested for interaction with neighborhood size.
+
+Very tentative conclusion (based on testing Candlestick, CalAcad, and RioVista pairs only):  The more intuitive (pbykpratio) test gives qualitatively similar results to the Dellinger et al test (pbymatchratio) at comparable threshold, and it allows for greater dynamic control of the threshold of change.
+
+Now working only with pbykpratio, I went on to test the relaxed matching regime I reported on five or six days ago, trying K=2 and K=5 in the knnMatch routine.  You can sift through the results in the relaxeddetect folder.
+
+For my money, the picks of the bunch have K = 5.  For Candlestick and CalAcad, I like threshold tuned down from .005 to 10^-6 (not to be confused with the original 10^-6 -- this is a much more stringent threshold when applied in pbykpratio).  For RioVista, I like threshold .05.  Links to these three:  Candlestick, CalAcad, RioVista.  RioVista is different, again, because the overall matchrate is so low -- below threshold .001 you get few to zero change points.  For implementation we may want to consider adjusting the threshold based on match rate. 
