@@ -15,7 +15,7 @@ import scipy.stats
 
 
 # global parameters
-MATCH_PROXIMITY_IN_PIXELS = 8              # empirical
+MATCH_PROXIMITY_IN_PIXELS = 4              # empirical
 MATCH_NEIGHBORHOOD_IN_PIXELS = 40       	# empirical
 MIN_NEIGHBORHOOD_KEYPOINTS = 10              # empirical
 MATCH_PROBABILITY_THRESHOLD = 1e-6      	# empirical
@@ -107,18 +107,28 @@ def _plot_local_keypoint_histogram(kp_histogram_forward,kp_histogram_backward,im
     plot_box[:,-1,:] = (0,0,0)      # edge divider
     return plot_box
 
-def _calculate_proximity_threshold(offsets,num_sigma=3):
+def _calculate_proximity_threshold(offsets,num_sigma=2):
     # Calculates the optimum proximity threshold
     # Starts by fitting histogram of match offsets to a gaussian
     # The threshold is the center of the gaussian fit, plus num_sigma * sigma
-    # Note the means we don't cut off matches that are at short distances; small effect
+    # Note this means we don't cut off matches that are at short distances; small effect
+    # If fit fails, return 1.5 * REGISTRATION_OFFSET
 
     xdat = np.arange(len(offsets))
     a_guess = np.amax(offsets)
-    x0_guess = 16        # empirical
-    sigma_guess = 4     # empirical
-    popt,pcov = curve_fit(_gaussian,xdat,offsets,[a_guess,x0_guess,sigma_guess])
-    return int(popt[1] + num_sigma * popt[2])
+    x0_guess = np.argmax(offsets)       
+    sigma_guess = MATCH_PROXIMITY_IN_PIXELS / 2                     # empirical
+    try:
+        popt,pcov = curve_fit(_gaussian,xdat,offsets,[a_guess,x0_guess,sigma_guess])
+    except OptimizeWarning:
+        print "Gaussian fit of registration error failed"
+        return MATCH_PROXIMITY_IN_PIXELS    # default
+
+    if popt[1] >= 0:
+        return int(popt[1] + num_sigma * popt[2])
+    else:
+        print "Gaussian fit of registration error failed"
+        return MATCH_PROXIMITY_IN_PIXELS
 
 
 # main
@@ -155,13 +165,17 @@ kps2,desc2 = KAZE.detectAndCompute(im2,None)
 print 'Found {0} kps in im1'.format(len(kps1))
 print 'Found {0} kps in im2'.format(len(kps2))
 
-# find 2-way matches then do proximity test
+# find 2-way matches
 match_candidates = FLANN.match(desc1,desc2)
 print 'Found {0} match candidates...'.format(len(match_candidates))
+
+# calculate proximity limit
+offsets = _calculate_offsets_between_matches(kps1,kps2,match_candidates)
+proximity_limit = _calculate_proximity_threshold(offsets)
 matches = [
-	m for m in match_candidates if _are_close(kps1[m.queryIdx],kps2[m.trainIdx],MATCH_PROXIMITY_IN_PIXELS)
+	m for m in match_candidates if _are_close(kps1[m.queryIdx],kps2[m.trainIdx],proximity_limit)
 ]
-print '...of which {0} are within the proximity limit of {1} pixels.'.format(len(matches),MATCH_PROXIMITY_IN_PIXELS)
+print '...of which {0} are within the proximity limit of {1} pixels.'.format(len(matches),proximity_limit)
 kps1_matched = [kps1[m.queryIdx] for m in matches]
 kps2_matched = [kps2[m.trainIdx] for m in matches]
 
@@ -253,7 +267,7 @@ cv2.putText(text_box,label_string,label_origin,1,1.0,black_color)
 label_string = "MATCH_PROBABILITY_THRESHOLD = {0}".format(MATCH_PROBABILITY_THRESHOLD)
 label_origin = (20,120)
 cv2.putText(text_box,label_string,label_origin,1,1.0,black_color)
-label_string = "FLANN matcher, cross-check, {0}-pxl, search: 50; KAZE".format(MATCH_PROXIMITY_IN_PIXELS)
+label_string = "FLANN matcher, cross-check, {0}-pxl, search: 50; KAZE".format(proximity_limit)
 label_origin = (20,140)
 cv2.putText(text_box,label_string,label_origin,1,1.0,black_color)
 
