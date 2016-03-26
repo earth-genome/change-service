@@ -188,10 +188,10 @@ FLANN = cv2.FlannBasedMatcher(index_parameters,search_parameters)
 AKAZE = cv2.AKAZE_create(threshold= KAZE_PARAMETER)
 
 # find keypints and descriptors
-#kps1,desc1 = SIFT.detectAndCompute(im1,None)
-#kps2,desc2 = SIFT.detectAndCompute(im2,None)
-kps1,desc1 = KAZE.detectAndCompute(im1,None)
-kps2,desc2 = KAZE.detectAndCompute(im2,None)
+kps1,desc1 = SIFT.detectAndCompute(im1,None)
+kps2,desc2 = SIFT.detectAndCompute(im2,None)
+#kps1,desc1 = KAZE.detectAndCompute(im1,None)
+#kps2,desc2 = KAZE.detectAndCompute(im2,None)
 #kps1,desc1 = AKAZE.detectAndCompute(im1,None)
 #kps2,desc2 = AKAZE.detectAndCompute(im2,None)
 print 'Found {0} kps in im1'.format(len(kps1))
@@ -241,7 +241,6 @@ matches = [m for m in match_candidates if _check_homography(
     kps1[m.queryIdx].pt,kps2[m.trainIdx].pt,H)]
 print '...of which {0} are within the proximity limit of {1} pixels.'.format(
     len(matches),MATCH_PROXIMITY_IN_PIXELS)
-print 'match rate: {}'.format(float(len(matches))/len(match_candidates))
 
   
 #for m in matches:
@@ -257,6 +256,7 @@ N_kps2 = len(kps2)
 N_matches = len(matches)
 match_rate_1 = N_matches/float(N_kps1)           #  average match rate for im1
 match_rate_2 = N_matches/float(N_kps2)           #  average match rate for im2
+print 'match rates for im1, im2: {}, {}'.format(match_rate_1,match_rate_2)
 
 # OUTPUT
 
@@ -295,11 +295,14 @@ cv2.putText(text_box,label_string,label_origin,1,1.0,black_color)
 label_string = "Keypoints: {0}".format(len(kps2))
 label_origin = (20+IMAGE_WIDTH,40)
 cv2.putText(text_box,label_string,label_origin,1,1.0,black_color)
-label_string = "Matched keypoints: {0}".format(len(kps2_matched))
+label_string = "Matched keypoints: {0}; match rate: {1:.3}".format(len(kps1_matched),match_rate_1)
 label_origin = (20,60)
 cv2.putText(text_box,label_string,label_origin,1,1.0,match_color)
+label_string = "Matched keypoints: {0}; match rate: {1:.3}".format(len(kps2_matched),match_rate_2)
+label_origin = (20+IMAGE_WIDTH,60)
+cv2.putText(text_box,label_string,label_origin,1,1.0,match_color)
 #label_string = "AKAZE (0.0003); proximity test @ {0} pixels; BFMATCH".format(MATCH_PROXIMITY_IN_PIXELS)
-label_string = "SIFT; proximity test @ {0} pixels; BFMATCH".format(MATCH_PROXIMITY_IN_PIXELS)
+label_string = "SIFT; homography test @ {0} pixels; BFMATCH".format(MATCH_PROXIMITY_IN_PIXELS)
 label_origin = (20,80)
 cv2.putText(text_box,label_string,label_origin,1,1.0,black_color)
 

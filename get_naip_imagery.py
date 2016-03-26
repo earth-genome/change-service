@@ -12,8 +12,11 @@ import json
 import os
 
 # params
-COUNTY_INDEX = 33
-NUMBER_OF_LOCATIONS_PER_COUNTY = 4
+YEAR1 = 2010
+YEAR2 = 2012
+DIM = 500
+COUNTY_INDEX = 5
+NUMBER_OF_LOCATIONS_PER_COUNTY = 6
 
 # api info
 API_BASE_COORDS = 'http://genome.enviro-service.appspot.com/land/validation'
@@ -63,13 +66,13 @@ for n,coords in enumerate(data['results']):
 	payload = {}
 	payload['lon'] = mylong
 	payload['lat'] = mylat
-	payload['dimension'] = 1000
-	payload['year'] = 2010			# do 2010 first
+	payload['dimension'] = DIM
+	payload['year'] = YEAR1			# do 2010 first
 	url_payload = urllib.urlencode(payload)
 	full_url = API_BASE_IMAGERY + '?' + url_payload
 	response = urllib2.urlopen(full_url)
 	image = response.read()
-	filename = "{}{:0>3d}-2010.jpg".format(county_name,n+1)	# pad n+1 with zeros to 3 digits
+	filename = "{}{:0>3d}-{}.jpg".format(county_name,n+1,YEAR1)	# pad n+1 with zeros to 3 digits
 	save_path = os.path.join(args.save_location,filename)
 	with open(save_path,'wb') as f:
 		f.write(image)
@@ -77,12 +80,12 @@ for n,coords in enumerate(data['results']):
 		f_log.write(log_string)
 		print 'Saved image to file: {0} from URL: {1}'.format(save_path,full_url)
 		f.close()
-	payload['year'] = 2012		# now do 2012
+	payload['year'] = YEAR2		# now do 2012
 	url_payload = urllib.urlencode(payload)
 	full_url = API_BASE_IMAGERY + '?' + url_payload
 	response = urllib2.urlopen(full_url)
 	image = response.read()
-	filename = "{}{:0>3d}-2012.jpg".format(county_name,n+1)
+	filename = "{}{:0>3d}-{}.jpg".format(county_name,n+1,YEAR2)
 	save_path = os.path.join(args.save_location,filename)
 	with open(save_path,'wb') as f:
 		f.write(image)

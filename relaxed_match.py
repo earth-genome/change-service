@@ -15,13 +15,14 @@ import scipy.stats
 from scipy.optimize import curve_fit
 
 # global parameters
+FEATURES = 'SIFT'
 MATCH_PROXIMITY_IN_PIXELS = 4              # empirical
 KAZE_PARAMETER = 0.0003                 	# empirical
 #KAZE_PARAMETER = 0.001
 FLANN_KDTREE_INDEX = 0                  	# definition
 FLANN_TREE_NUMBER = 5                       # empirical
 FLANN_SEARCH_DEPTH = 50                 	# empirical
-KNEAREST = 2 # For relaxed matching, proximity test the KNEAREST matches 
+KNEAREST = 5 # For relaxed matching, proximity test the KNEAREST matches 
 IMAGE_WIDTH = 512                           # expected image width
 
 def _gaussian(x,a,x0,sigma):
@@ -164,52 +165,59 @@ im1_color = cv2.imread(args.image_1_filename,1)
 im2 = cv2.imread(args.image_2_filename,0)
 im2_color = cv2.imread(args.image_2_filename,1)
 
-# instantiate global OpenCV objects
-SIFT = cv2.xfeatures2d.SIFT_create()        # use default features
-BFMATCH = cv2.BFMatcher()
-KAZE = cv2.KAZE_create(threshold = KAZE_PARAMETER)
-index_parameters = dict(algorithm = FLANN_KDTREE_INDEX, trees = FLANN_TREE_NUMBER)
-search_parameters = dict(checks=FLANN_SEARCH_DEPTH)
-FLANN = cv2.FlannBasedMatcher(index_parameters,search_parameters)
-AKAZE = cv2.AKAZE_create(threshold= KAZE_PARAMETER)
+# instantiate global OpenCV objects; find keypoints and descriptors
+if FEATURES == 'SIFT':
+    SIFT = cv2.xfeatures2d.SIFT_create()
+    kps1,desc1 = SIFT.detectAndCompute(im1,None)
+    kps2,desc2 = SIFT.detectAndCompute(im2,None)
+elif FEATURES == 'KAZE':
+    KAZE = cv2.KAZE_create(threshold = KAZE_PARAMETER)
+    kps1,desc1 = KAZE.detectAndCompute(im1,None)
+    kps2,desc2 = KAZE.detectAndCompute(im2,None)
 
-# find keypints and descriptors
-#kps1,desc1 = SIFT.detectAndCompute(im1,None)
-#kps2,desc2 = SIFT.detectAndCompute(im2,None)
-kps1,desc1 = KAZE.detectAndCompute(im1,None)
-kps2,desc2 = KAZE.detectAndCompute(im2,None)
-#kps1,desc1 = AKAZE.detectAndCompute(im1,None)
-#kps2,desc2 = AKAZE.detectAndCompute(im2,None)
 print 'Found {0} kps in im1'.format(len(kps1))
 print 'Found {0} kps in im2'.format(len(kps2))
 
+
+
+#index_parameters = dict(algorithm = FLANN_KDTREE_INDEX, trees = FLANN_TREE_NUMBER)
+#search_parameters = dict(checks=FLANN_SEARCH_DEPTH)
+#FLANN = cv2.FlannBasedMatcher(index_parameters,search_parameters)
+#AKAZE = cv2.AKAZE_create(threshold= KAZE_PARAMETER)
+
+# find keypints and descriptors
+#kps1,desc1 = AKAZE.detectAndCompute(im1,None)
+#kps2,desc2 = AKAZE.detectAndCompute(im2,None)
+
+
 # find 2-way matches
+BFMATCH = cv2.BFMatcher()
 #match_candidates = FLANN.match(desc1,desc2)
-match_candidates = BFMATCH.match(desc1,desc2)
+#match_candidates = BFMATCH.match(desc1,desc2)
 # Use this instead for relaxed matching:
-#match_candidates = BFMATCH.knnMatch(desc1,desc2,k=KNEAREST)
+match_candidates = BFMATCH.knnMatch(desc1,desc2,k=KNEAREST)
 print 'Found {0} match candidates...'.format(len(match_candidates))
 
 # do proximity test
 #match_offsets = _calculate_offsets_between_matches(kps1,kps2,match_candidates)
 #proximity_in_pixels = _calculate_proximity_threshold(match_offsets)
 #MATCH_PROXIMITY_IN_PIXELS = proximity_in_pixels
-matches = [
-	m for m in match_candidates if _are_close(kps1[m.queryIdx],kps2[m.trainIdx],MATCH_PROXIMITY_IN_PIXELS)
-]
+#matches = [
+#	m for m in match_candidates if _are_close(kps1[m.queryIdx],kps2[m.trainIdx],MATCH_PROXIMITY_IN_PIXELS)
+#]
 # For relaxed matching, look through top KNEAREST match candidates in order
 # seeking one that passes the proximity test: 
-#matches = []
-#for knnlist in match_candidates:
-#    for m in knnlist:
-#        if _are_close(kps1[m.queryIdx],kps2[m.trainIdx],
-#                      MATCH_PROXIMITY_IN_PIXELS):
-#            matches.append(m)
-#            break
-#avg_close = _avg_close_knearest(match_candidates,kps1,kps2)
-#print 'K: {}, radius: {}, avg match candidates within radius: {}'.format(
-#    KNEAREST,MATCH_PROXIMITY_IN_PIXELS,avg_close)
-#match_candidates = [m for knnlist in match_candidates for m in knnlist]
+matches = []
+for knnlist in match_candidates:
+    for m in knnlist:
+        if _are_close(kps1[m.queryIdx],kps2[m.trainIdx],
+                      MATCH_PROXIMITY_IN_PIXELS):
+            matches.append(m)
+            break
+avg_close = _avg_close_knearest(match_candidates,kps1,kps2)
+print 'K: {}, radius: {}, avg match candidates within radius: {}'.format(
+    KNEAREST,MATCH_PROXIMITY_IN_PIXELS,avg_close)
+match_candidates = [m for knnlist in match_candidates for m in knnlist]
 
 print '...of which {0} are within the proximity limit of {1} pixels.'.format(len(matches),MATCH_PROXIMITY_IN_PIXELS)
 #for m in matches:
@@ -225,6 +233,7 @@ N_kps2 = len(kps2)
 N_matches = len(matches)
 match_rate_1 = N_matches/float(N_kps1)           #  average match rate for im1
 match_rate_2 = N_matches/float(N_kps2)           #  average match rate for im2
+print 'match rates for im1, im2: {}, {}'.format(match_rate_1,match_rate_2)
 
 # OUTPUT
 
@@ -263,11 +272,14 @@ cv2.putText(text_box,label_string,label_origin,1,1.0,black_color)
 label_string = "Keypoints: {0}".format(len(kps2))
 label_origin = (20+IMAGE_WIDTH,40)
 cv2.putText(text_box,label_string,label_origin,1,1.0,black_color)
-label_string = "Matched keypoints: {0}".format(len(kps2_matched))
+label_string = "Matched keypoints: {0}; match rate: {1:.3}".format(len(kps1_matched),match_rate_1)
 label_origin = (20,60)
 cv2.putText(text_box,label_string,label_origin,1,1.0,match_color)
+label_string = "Matched keypoints: {0}; match rate: {1:.3}".format(len(kps2_matched),match_rate_2)
+label_origin = (20+IMAGE_WIDTH,60)
+cv2.putText(text_box,label_string,label_origin,1,1.0,match_color)
 #label_string = "AKAZE (0.0003); proximity test @ {0} pixels; BFMATCH".format(MATCH_PROXIMITY_IN_PIXELS)
-label_string = "SIFT; proximity test @ {0} pixels; BFMATCH".format(MATCH_PROXIMITY_IN_PIXELS)
+label_string = FEATURES + "; proximity test @ {0} pixels; BFMATCH".format(MATCH_PROXIMITY_IN_PIXELS)
 label_origin = (20,80)
 cv2.putText(text_box,label_string,label_origin,1,1.0,black_color)
 
