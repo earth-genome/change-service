@@ -8,11 +8,8 @@ Arguments:
 import argparse
 import numpy as np
 import cv2
-from scipy.stats import binom
-from scipy.stats import kstest
-from matplotlib.path import Path
+import scipy.stats
 import matplotlib.pyplot as plt
-import matplotlib.patches as patches
 
 # global parameters
 NUMBER_OF_PATCHES_WIDE = 16
@@ -33,22 +30,24 @@ def _calculate_keypoint_count_pmf(kp_count):
     max_count = kp_count.max()
     num_keypoints = kp_count.sum()
     prob = np.mean(kp_count) / float(num_keypoints)
-    print("Kps in patches: Max: {0}, total: {1}, prob: {2}".format(max_count,num_keypoints,prob))
 
     # calculate expected binomial pmf
     count_vals = np.arange(max_count+1)
-    pmf_vals = NUMBER_OF_PATCHES_HIGH * NUMBER_OF_PATCHES_WIDE * binom.pmf(count_vals,num_keypoints,prob)
-    return pmf_vals
+    pmf_vals = NUMBER_OF_PATCHES_HIGH * NUMBER_OF_PATCHES_WIDE * scipy.stats.binom.pmf(count_vals,num_keypoints,prob)
+
+    # calculate chi-squared
+    kp_count_histogram = np.histogram(kp_count,max_count+1)[0]
+    chi2,p = scipy.stats.chisquare(kp_count_histogram,pmf_vals)
+
+    return pmf_vals,chi2,p
 
 def _prepare_image(im,kps):
     # draw grid lines and keypoints on image
-
     im_out = im.copy()
     for x in np.arange(NUMBER_OF_PATCHES_WIDE):
         im[:,x*PATCH_WIDTH] = 0
     for y in np.arange(NUMBER_OF_PATCHES_HIGH):
         im[y*PATCH_HEIGHT,:] = 0
-
     cv2.drawKeypoints(im,kps,im_out,color=keypoint_color,flags=0)
     return im_out
 
@@ -78,7 +77,9 @@ print 'Found {0} kps in image'.format(len(kps))
 kp_count = _count_keypoints_in_each_neighborhood(kps,im)
 
 # calculate theoretical binomial pmf
-pmf_vals = _calculate_keypoint_count_pmf(kp_count)
+pmf_vals,chi2,p_val = _calculate_keypoint_count_pmf(kp_count)
+
+print("Binomial fit: chi2 = {0}, p val = {1}".format(chi2,p_val))
 
 # build figure 
 fig = plt.figure(figsize=(16,6))
@@ -87,15 +88,10 @@ fig = plt.figure(figsize=(16,6))
 ax1 = fig.add_subplot(1,2,1)
 max_count = kp_count.max()
 count_vals = np.arange(max_count+1)
-kp_count_histogram, bins, patch_silent_list = ax1.hist(kp_count, bins = max_count+1, range=(0,max_count+1), histtype = 'bar')
+kp_count_histogram, bins, patch_silent_list = ax1.hist(kp_count,bins=max_count+1,range=(0,max_count+1),histtype ='bar')
 ax1.plot(count_vals+0.5, pmf_vals,'ro')     # offset x vals by 0.5 to center point on bar
 ax1.set_xlabel("Keypoints in patch")
 ax1.set_ylabel("Number of patches")
-
-# calculate Kolmogorov-Smirnov test value
-#kp_count_histogram_normalized = kp_count_histogram / ( NUMBER_OF_PATCHES_HIGH * NUMBER_OF_PATCHES_WIDE)
-#ks_val,p_val = kstest(kp_count_histogram_normalized,"binom.pdf",args=[count_vals,num_keypoints,prob])
-#print("KS test: {0}".format(ks_val))
 
 # add image with keypoints
 im_drawn = _prepare_image(im,kps)
