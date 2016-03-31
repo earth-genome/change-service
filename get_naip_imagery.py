@@ -1,19 +1,20 @@
 #get_naip_imagery.py
 """
 Get NAIP imagery.
-Requires two arguments: a directory to save imagery, and a filename for the log.
+:params:
+: prefix_name: string prefix for imagery save filenames
+: save_location: directory to save imagery
+: log_file: name of file to log downloaded images
 """
 
 import argparse
-import numpy as np
-import urllib
 import urllib2
 import json
 import os
 
 # params
-BASE_LAT = 37.314
-BASE_LONG = -121.948
+BASE_LAT = 37.314				# san jose
+BASE_LONG = -121.948			# san jose
 DELTA_LAT = 0.02
 DELTA_LONG = 0.03
 NUMBER_OF_STEPS = 4   	# will grab this many images squared times 2 (for 2010, 2012)
