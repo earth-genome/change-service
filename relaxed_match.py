@@ -15,7 +15,7 @@ import scipy.stats
 from scipy.optimize import curve_fit
 
 # global parameters
-FEATURES = 'SIFT'
+FEATURES = 'KAZE'
 MATCH_PROXIMITY_IN_PIXELS = 4              # empirical
 KAZE_PARAMETER = 0.0003                 	# empirical
 #KAZE_PARAMETER = 0.001
@@ -23,7 +23,7 @@ FLANN_KDTREE_INDEX = 0                  	# definition
 FLANN_TREE_NUMBER = 5                       # empirical
 FLANN_SEARCH_DEPTH = 50                 	# empirical
 KNEAREST = 5 # For relaxed matching, proximity test the KNEAREST matches 
-IMAGE_WIDTH = 512                           # expected image width
+IMAGE_WIDTH = 512                           # expected image width 
 
 def _gaussian(x,a,x0,sigma):
     # Defines a gaussian function for curve fitting
@@ -217,7 +217,9 @@ for knnlist in match_candidates:
 avg_close = _avg_close_knearest(match_candidates,kps1,kps2)
 print 'K: {}, radius: {}, avg match candidates within radius: {}'.format(
     KNEAREST,MATCH_PROXIMITY_IN_PIXELS,avg_close)
-match_candidates = [m for knnlist in match_candidates for m in knnlist]
+#match_candidates = [m for knnlist in match_candidates for m in knnlist]
+# on second thought, histogram only the top match candidate
+match_candidates = [knnlist[0] for knnlist in match_candidates]
 
 print '...of which {0} are within the proximity limit of {1} pixels.'.format(len(matches),MATCH_PROXIMITY_IN_PIXELS)
 #for m in matches:
@@ -240,12 +242,12 @@ print 'match rates for im1, im2: {}, {}'.format(match_rate_1,match_rate_2)
 # prepare output image
 im1_out = im1_color.copy()
 im2_out = im2_color.copy()
-cv2.drawKeypoints(im1_color,kps1_matched,im1_out,color=match_color,flags=0)
-#cv2.drawKeypoints(im1_color,kps1_matched,im1_out,color=match_color,
-#                  flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-cv2.drawKeypoints(im2_color,kps2_matched,im2_out,color=match_color,flags=0)
-#cv2.drawKeypoints(im2_color,kps2_matched,im2_out,color=match_color,
-#                  flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+#cv2.drawKeypoints(im1_color,kps1_matched,im1_out,color=match_color,flags=0)
+cv2.drawKeypoints(im1_color,kps1_matched,im1_out,color=match_color,
+                  flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+#cv2.drawKeypoints(im2_color,kps2_matched,im2_out,color=match_color,flags=0)
+cv2.drawKeypoints(im2_color,kps2_matched,im2_out,color=match_color,
+                  flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
 #cv2.drawKeypoints(im1_out,kps1_unmatched,im1_out,color=non_match_color,flags=0)
 #cv2.drawKeypoints(im2_out,kps2_unmatched,im2_out,color=non_match_color,flags=0)
 

@@ -197,10 +197,14 @@ kps2_not_matched = set(kps2) - set(kps2_matched)
 kps2_changed = []
 kps2_local_histogram = np.zeros((N_kps2,),dtype=np.int)
 
+# added some counts of local num kps, matches for testing purposes
+#avg_local_kps, avg_local_matches = 0, 0
 for kp in kps2_not_matched:
     local_kps = filter(lambda x: _are_close(kp,x,MATCH_NEIGHBORHOOD_IN_PIXELS),kps2)
     local_matches = filter(lambda x: _are_close(kp,x,MATCH_NEIGHBORHOOD_IN_PIXELS),kps2_matched)
-    kps2_local_histogram[len(local_kps)] += 1    
+    kps2_local_histogram[len(local_kps)] += 1
+#    avg_local_kps += len(local_kps)
+#    avg_local_matches += len(local_matches)
 
     # do statistical test for each un-matched keypoint
     local_match_rate = len(local_matches)/float(N_matches)
@@ -209,6 +213,7 @@ for kp in kps2_not_matched:
         kps2_changed.append(kp)
 
 print 'Found {0} change keypoints (forward direction)'.format(len(kps2_changed))
+#print 'Avg local kps, avg local matches: {}, {}'.format(avg_local_kps/float(len(kps2_not_matched)), avg_local_matches/float(len(kps2_not_matched)))
 
 # repeat above for backward direction
 kps1_not_matched = set(kps1) - set(kps1_matched)

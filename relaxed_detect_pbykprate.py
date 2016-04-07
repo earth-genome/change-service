@@ -18,7 +18,7 @@ import scipy.stats
 MATCH_PROXIMITY_IN_PIXELS = 4              # empirical
 MATCH_NEIGHBORHOOD_IN_PIXELS = 40       	# empirical
 MIN_NEIGHBORHOOD_KEYPOINTS = 10              # empirical
-MATCH_PROBABILITY_THRESHOLD = .05      	# empirical
+MATCH_PROBABILITY_THRESHOLD = 1e-10      	# empirical
 KAZE_PARAMETER = 0.0003                 	# empirical
 FLANN_KDTREE_INDEX = 0                  	# definition
 FLANN_TREE_NUMBER = 5                       # empirical
@@ -121,6 +121,28 @@ def _calculate_proximity_threshold(offsets,num_sigma=3):
     popt,pcov = curve_fit(_gaussian,xdat,offsets,[a_guess,x0_guess,sigma_guess])
     return int(popt[1] + num_sigma * popt[2])
 
+def _count_close_knearest(kNNmatchlist,kps1,kps2,
+                          radius=MATCH_PROXIMITY_IN_PIXELS):
+    """Determine how many of the top-k match candidates fall within
+    radius of the associated feature.
+    """
+    count = sum([_are_close(kps1[m.queryIdx],kps2[m.trainIdx],radius)
+                 for m in kNNmatchlist])
+    return count
+
+def _avg_close_knearest(match_cands,kps1,kps2,
+                        radius=MATCH_PROXIMITY_IN_PIXELS):
+    """Across a list of match candidates, determine the average number
+    that fall within radius of their associated feature. 
+    """
+    count = 0
+    non_empty_nbhds = 0
+    for mlist in match_cands:
+        num_close = _count_close_knearest(mlist,kps1,kps2,radius)
+        if num_close > 0:
+            count += num_close
+            non_empty_nbhds += 1
+    return count/float(non_empty_nbhds)
 
 # main
 
@@ -179,7 +201,10 @@ for knnlist in match_candidates:
 #avg_close = _avg_close_knearest(match_candidates,kps1,kps2)
 #print 'K: {}, radius: {}, avg match candidates within radius: {}'.format(
 #    KNEAREST,MATCH_PROXIMITY_IN_PIXELS,avg_close)
-match_candidates = [m for knnlist in match_candidates for m in knnlist]
+#match_candidates = [m for knnlist in match_candidates for m in knnlist]
+# on second thought, histogram only the top match candidate
+match_candidates = [knnlist[0] for knnlist in match_candidates]
+
 
 print '...of which {0} are within the proximity limit of {1} pixels.'.format(len(matches),MATCH_PROXIMITY_IN_PIXELS)
 kps1_matched = [kps1[m.queryIdx] for m in matches]
