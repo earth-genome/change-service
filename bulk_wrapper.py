@@ -17,8 +17,16 @@ import pdb
 
 if __name__ == '__main__':
 
-    
+    default_params = dict(KAZE_PARAMETER = 0.0001,
+                    KNEAREST = 5,
+                    MATCH_PROXIMITY_IN_PIXELS = 4,
+                    CALCULATE_PROXIMITY_LIMIT = False,
+                    MATCH_NEIGHBORHOOD_IN_PIXELS = 40,
+                    MATCH_PROBABILITY_THRESHOLD = 1e-10)
 
+    # WIP: forward default parameters
+    params = default_params
+    
     # read and pair the image files 
     try:
         image_dir = sys.argv[1]
@@ -27,15 +35,18 @@ if __name__ == '__main__':
         sys.exit(0)
     fileSet = set()
     for dir_, _, files in os.walk(image_dir):
+        relDir = os.path.relpath(dir_, os.getcwd())
         for fileName in files:
-            relDir = os.path.relpath(dir_, os.getcwd())
-            relFile = os.path.join(relDir, fileName)
-            fileSet.add(relFile)
+            #relDir = os.path.relpath(dir_, os.getcwd())
+            #relFile = os.path.join(relDir, fileName)
+            #fileSet.add(relFile)
+            fileSet.add(fileName)
     image_files = sorted(fileSet)
+    
     pairs = []
     for f1, f2 in itertools.izip(image_files[::2],image_files[1::2]):
         if f1.split('-')[0] == f2.split('-')[0]:
             pairs.append([f1,f2])
     for p in pairs:
-        bulk_detect.detect_change(*p,relDir)
+        bulk_detect.detect_change(*p,RelDir=relDir,**params)
     
