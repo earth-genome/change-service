@@ -13,6 +13,10 @@ import numpy as np
 import cv2
 import scipy.stats
 from scipy.optimize import curve_fit
+from scipy.misc import factorial
+
+import matplotlib.pyplot as plt
+
 
 # global parameters
 MATCH_PROXIMITY_IN_PIXELS = 4              # empirical
@@ -21,11 +25,15 @@ KAZE_PARAMETER = 0.0003                 	# empirical
 FLANN_KDTREE_INDEX = 0                  	# definition
 FLANN_TREE_NUMBER = 5                       # empirical
 FLANN_SEARCH_DEPTH = 50                 	# empirical
-IMAGE_WIDTH = 512                           # expected image width
+IMAGE_WIDTH = 400                           # expected image width
 
 def _gaussian(x,a,x0,sigma):
     # Defines a gaussian function for curve fitting
     return a * np.exp(-(x-x0)**2/(2*sigma**2))
+
+def _poisson(x,a,y0,lam):
+    # Defines a poisson distribution for curve fitting
+    return y0 + a * np.exp(-lam) * lam**x / factorial(x)
 
 def _are_close(kpa,kpb,distance):
 	# Returns true if keypoints are separated by less than distance
@@ -53,6 +61,21 @@ def _calculate_offsets_between_matches(kps1,kps2,match_candidates,im_size=IMAGE_
         if dist < max_offset:
             offsets[dist] += 1      # ignore larger offsets
     return offsets
+
+def _show_offset_histogram_and_poisson(offsets,im_size=IMAGE_WIDTH):
+
+    xdat = np.arange(len(offsets))
+    lam_guess = np.argmax(offsets)
+    a_guess = offsets[lam_guess]
+    y0_guess = offsets[-1]
+    print("Poisson guesses: a = {0}, lam = {1}".format(a_guess,lam_guess))
+    popt,pcov = curve_fit(_poisson,xdat,offsets,[a_guess,lam_guess,y0_guess])
+    print("Poisson fit: {0}".format(popt))
+    fig = plt.figure(figsize=(16,6))
+    ax1 = fig.add_subplot(1,1,1)
+    ax1.plot(xdat, offsets,'ro')     
+    ax1.plot(xdat, _poisson(xdat,popt[0],popt[1],popt[2]),'bx')     
+    plt.show()
 
 def _make_offsets_histogram(offsets,cutoff,im_size=IMAGE_WIDTH):
     # Make histogram plot of pixel offsets between matches
@@ -83,7 +106,7 @@ def _plot_local_keypoint_histogram(kp_histogram_forward,kp_histogram_backward,im
     # Illustrates how many keypoints are local to each unmatched keypoint
 
     x_size = 1.0 * im_size    # stretch across one image
-    max_kps = 128.0           # aribtrary
+    max_kps = 128.0           # arbitrary
     x_scale_factor = x_size / max_kps
     y_size = 64.0               # for convenience of display
     max_val = int(1.5 * np.amax(np.concatenate((kp_histogram_forward,kp_histogram_backward),axis=0)))
@@ -110,13 +133,25 @@ def _calculate_proximity_threshold(offsets,num_sigma=3):
     # Starts by fitting histogram of match offsets to a gaussian
     # The threshold is the center of the gaussian fit, plus num_sigma * sigma
     # Note the means we don't cut off matches that are at short distances; small effect
+    # NOTE: Currently trying a possion fit instead of gaussian
 
     xdat = np.arange(len(offsets))
-    x0_guess = np.argmax(offsets)        
-    a_guess = offsets[x0_guess]
-    sigma_guess = 2     # empirical
-    popt,pcov = curve_fit(_gaussian,xdat,offsets,[a_guess,x0_guess,sigma_guess])
-    return int(popt[1] + num_sigma * popt[2])
+    
+    # gaussian version
+    #x0_guess = np.argmax(offsets)        
+    #sigma_guess = 2     # empirical
+    #popt,pcov = curve_fit(_gaussian,xdat,offsets,[a_guess,x0_guess,sigma_guess])
+    #return int(popt[1] + num_sigma * popt[2])
+
+    # poisson version
+    lam_guess = np.argmax(offsets)
+    a_guess = offsets[lam_guess]
+    y0_guess = offsets[-1]
+    print("Poisson guesses: a = {0}, lam = {1}".format(a_guess,lam_guess))
+    popt,pcov = curve_fit(_poisson,xdat,offsets,[a_guess,lam_guess,y0_guess])
+    print("Poisson fit: {0}".format(popt))
+
+    return popt   # should eventually test inverse CDF or something
 
 
 # main
@@ -125,6 +160,7 @@ def _calculate_proximity_threshold(offsets,num_sigma=3):
 black_color = (0,0,0)
 match_color = (0,255,0)
 non_match_color = (0,0,255)
+marker_color = (255,0,0)
 
 # read args
 parser = argparse.ArgumentParser(description='Match keypoints between two images.')
@@ -142,32 +178,39 @@ im2 = cv2.imread(args.image_2_filename,0)
 im2_color = cv2.imread(args.image_2_filename,1)
 
 # instantiate global OpenCV objects
-SIFT = cv2.xfeatures2d.SIFT_create()        # use default features
-BFMATCH = cv2.BFMatcher()
+#SIFT = cv2.xfeatures2d.SIFT_create()        # use default features
+#BFMATCH = cv2.BFMatcher()
 KAZE = cv2.KAZE_create(threshold = KAZE_PARAMETER)
 index_parameters = dict(algorithm = FLANN_KDTREE_INDEX, trees = FLANN_TREE_NUMBER)
 search_parameters = dict(checks=FLANN_SEARCH_DEPTH)
 FLANN = cv2.FlannBasedMatcher(index_parameters,search_parameters)
-AKAZE = cv2.AKAZE_create(threshold= KAZE_PARAMETER)
+#AKAZE = cv2.AKAZE_create(threshold= KAZE_PARAMETER)
 
 # find keypints and descriptors
 #kps1,desc1 = SIFT.detectAndCompute(im1,None)
 #kps2,desc2 = SIFT.detectAndCompute(im2,None)
-#kps1,desc1 = KAZE.detectAndCompute(im1,None)
-#kps2,desc2 = KAZE.detectAndCompute(im2,None)
-kps1,desc1 = AKAZE.detectAndCompute(im1,None)
-kps2,desc2 = AKAZE.detectAndCompute(im2,None)
+kps1,desc1 = KAZE.detectAndCompute(im1,None)
+kps2,desc2 = KAZE.detectAndCompute(im2,None)
+#kps1,desc1 = AKAZE.detectAndCompute(im1,None)
+#kps2,desc2 = AKAZE.detectAndCompute(im2,None)
 print 'Found {0} kps in im1'.format(len(kps1))
 print 'Found {0} kps in im2'.format(len(kps2))
 
 # find 2-way matches
-#match_candidates = FLANN.match(desc1,desc2)
-match_candidates = BFMATCH.match(desc1,desc2)
+match_candidates = FLANN.match(desc1,desc2)
+#match_candidates = BFMATCH.match(desc1,desc2)
 print 'Found {0} match candidates...'.format(len(match_candidates))
 
 # do proximity test
-#match_offsets = _calculate_offsets_between_matches(kps1,kps2,match_candidates)
-#proximity_in_pixels = _calculate_proximity_threshold(match_offsets)
+match_offsets = _calculate_offsets_between_matches(kps1,kps2,match_candidates)
+
+# show match offset histogram and poisson match
+_show_offset_histogram_and_poisson(match_offsets,im_size=IMAGE_WIDTH)
+
+
+proximity_in_pixels = _calculate_proximity_threshold(match_offsets)
+offsets_histogram = _make_offsets_histogram(match_offsets,MATCH_PROXIMITY_IN_PIXELS)
+
 #MATCH_PROXIMITY_IN_PIXELS = proximity_in_pixels
 matches = [
 	m for m in match_candidates if _are_close(kps1[m.queryIdx],kps2[m.trainIdx],MATCH_PROXIMITY_IN_PIXELS)
@@ -196,8 +239,6 @@ cv2.drawKeypoints(im2_color,kps2_matched,im2_out,color=match_color,flags=0)
 #cv2.drawKeypoints(im2_out,kps2_unmatched,im2_out,color=non_match_color,flags=0)
 
 # calculate histogram and plot
-match_offsets = _calculate_offsets_between_matches(kps1,kps2,match_candidates)
-offsets_histogram = _make_offsets_histogram(match_offsets,MATCH_PROXIMITY_IN_PIXELS)
 #local_keypoint_histogram = _plot_local_keypoint_histogram(kps2_local_histogram,kps1_local_histogram)
 local_keypoint_histogram = offsets_histogram 
 hist_plots = np.concatenate((offsets_histogram,local_keypoint_histogram),axis=1)
@@ -221,7 +262,7 @@ cv2.putText(text_box,label_string,label_origin,1,1.0,black_color)
 label_string = "Matched keypoints: {0}".format(len(kps2_matched))
 label_origin = (20,60)
 cv2.putText(text_box,label_string,label_origin,1,1.0,match_color)
-label_string = "AKAZE (0.0003); proximity test @ {0} pixels; BFMATCH".format(MATCH_PROXIMITY_IN_PIXELS)
+label_string = "KAZE (0.0003); proximity test @ {0} pixels; FLANN".format(MATCH_PROXIMITY_IN_PIXELS)
 label_origin = (20,80)
 cv2.putText(text_box,label_string,label_origin,1,1.0,black_color)
 

@@ -12,8 +12,8 @@ import scipy.stats
 import matplotlib.pyplot as plt
 
 # global parameters
-NUMBER_OF_PATCHES_WIDE = 16
-NUMBER_OF_PATCHES_HIGH = 24
+NUMBER_OF_PATCHES_WIDE = 20
+NUMBER_OF_PATCHES_HIGH = 20
 KAZE_PARAMETER = 0.0003                 	# empirical
 keypoint_color = (255,0,0)
 

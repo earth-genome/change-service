@@ -8,15 +8,15 @@ Get NAIP imagery.
 """
 
 import argparse
+import urllib
 import urllib2
 import json
 import os
 
 # params
-BASE_LAT = 37.314				# san jose
-BASE_LONG = -121.948			# san jose
-DELTA_LAT = 0.02
-DELTA_LONG = 0.03
+BASE_LAT, BASE_LONG = 37.314,-121.948				# san jose
+#BASE_LONG = -121.948			# san jose
+DELTA_LAT, DELTA_LONG = 0.02, 0.03
 NUMBER_OF_STEPS = 4   	# will grab this many images squared times 2 (for 2010, 2012)
 
 # api info
