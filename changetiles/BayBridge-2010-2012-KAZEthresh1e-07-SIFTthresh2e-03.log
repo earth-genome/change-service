@@ -1,0 +1,25 @@
+tile.py run Tue Apr 12 20:51:30 2016
+Found 900 kps in im1
+Found 1077 kps in im2
+Found 900 match candidates...
+...of which 50 are within the proximity limit of 4 pixels.
+Found 0 change keypoints (forward direction)
+Found 0 change keypoints (backward direction)
+Found 900 kps in im1
+Found 1077 kps in im2
+Found 900 match candidates...
+...of which 50 are within the proximity limit of 4 pixels.
+Found 0 change keypoints (forward direction)
+Found 0 change keypoints (backward direction)
+Found 1567 kps in im1
+Found 1729 kps in im2
+Found 1567 match candidates...
+...of which 227 are within the proximity limit of 4 pixels.
+Found 7 change keypoints (forward direction)
+Found 1 change keypoints (backward direction)
+Found 1567 kps in im1
+Found 1729 kps in im2
+Found 1567 match candidates...
+...of which 357 are within the proximity limit of 4 pixels.
+Found 55 change keypoints (forward direction)
+Found 16 change keypoints (backward direction)
