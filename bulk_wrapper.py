@@ -8,6 +8,8 @@ Currently only allows default parameters as specified in bulk_detect.py.
 
 Output: A collection of image files, each of which includes an image pair,
 change points, and parameters.
+
+Example: $ python bulk_wrapper.py 'dim1000test/'
 """
 import sys
 import os
@@ -16,13 +18,15 @@ import bulk_detect
 import pdb
 
 if __name__ == '__main__':
-
-    default_params = dict(KAZE_PARAMETER = 0.0001,
+    CT_THRESHOLD_FRAC = .01
+    CT_NBHD_SIZE = 120
+    default_params = dict(FEATURES = 'KAZE',
+                    KAZE_PARAMETER = 0.0003,
                     KNEAREST = 5,
                     MATCH_PROXIMITY_IN_PIXELS = 4,
                     CALCULATE_PROXIMITY_LIMIT = False,
                     MATCH_NEIGHBORHOOD_IN_PIXELS = 40,
-                    MATCH_PROBABILITY_THRESHOLD = 1e-10)
+                    MATCH_PROBABILITY_THRESHOLD = 1e-8)
 
     # WIP: forward default parameters
     params = default_params
@@ -48,5 +52,11 @@ if __name__ == '__main__':
         if f1.split('-')[0] == f2.split('-')[0]:
             pairs.append([f1,f2])
     for p in pairs:
-        bulk_detect.detect_change(*p,RelDir=relDir,**params)
+        im2_color, changepoints, total_kps = bulk_detect.detect_change(*p,
+                                                RelDir=relDir,**params)
+        agg_image = bulk_detect.agglomerate(im2_color,changepoints,
+                                CT_NBHD_SIZE,
+                                total_kps*CT_THRESHOLD_FRAC)
+        bulk_detect.write_agg_im(agg_image,CT_NBHD_SIZE,
+                                total_kps*CT_THRESHOLD_FRAC,*p,**params)
     

@@ -31,6 +31,7 @@ import os
 import numpy as np
 import cv2
 import scipy.stats
+import scipy.signal
 import pdb
 
 # set up color choices
@@ -164,7 +165,7 @@ def detect_change(im1_file,
                     MATCH_PROXIMITY_IN_PIXELS = 4,
                     CALCULATE_PROXIMITY_LIMIT = False,
                     MATCH_NEIGHBORHOOD_IN_PIXELS = 40,
-                    MATCH_PROBABILITY_THRESHOLD = 1e-10):
+                    MATCH_PROBABILITY_THRESHOLD = 1e-8):
 
     # load image files [note grayscale: 0; color: 1]
     im1_file_relpath = os.path.join(RelDir, im1_file)
@@ -184,8 +185,10 @@ def detect_change(im1_file,
                                     date2,
                                     FEATURES,
                                     'kNN'+str(KNEAREST),
+                                    'prox'+str(MATCH_PROXIMITY_IN_PIXELS),
                                     'thresh'+str(MATCH_PROBABILITY_THRESHOLD),
                                     'KAZEpar'+str(KAZE_PARAMETER),
+                                    'nbhd'+str(MATCH_NEIGHBORHOOD_IN_PIXELS),
                                     '.jpg'])
 
     # instantiate global OpenCV objects
@@ -337,10 +340,63 @@ def detect_change(im1_file,
     print save_image_filename
     cv2.imwrite(save_image_filename,im_C)
 
-    return
+    return im2_color, kps1_changed + kps2_changed, (len(kps1)+len(kps2))/2.
+
+def agglomerate(image,changepoints,nbhd_size,ct_threshold):
+    """Count the number of changepoints on each nbhd_size square, and
+    threshold the count by ct_threshold.  Returns an image with alpha
+    mask of full or half opacity, according to whether the neighborhood
+    centered on the point does or does not meet the ct_threshold. """
+
+    OPACITY = 63 # alpha channel, on a scale 0-255
+    FULL_OPACITY = 255
+    ct_kernel = np.ones((nbhd_size,nbhd_size))    
+    changepoints_image = np.zeros(image.shape[:2],dtype=int)
+    for kp in changepoints:
+        changepoints_image[kp.pt[1],kp.pt[0]] = 1
+    ct_image = scipy.signal.fftconvolve(changepoints_image,ct_kernel,
+                                        mode='same')
+    alpha_mask = np.ones(image.shape[:2],dtype=int)*OPACITY
+    alpha_mask[ct_image > ct_threshold] = FULL_OPACITY
+    return np.dstack((image,alpha_mask))
+
+def write_agg_im(agg_image,ct_nbhd_size,ct_threshold,im1_file,im2_file,
+                 **kwparams):
+    """Write the agg image to file."""
+    file_base = im2_file.split('-')[0]
+    date1 = im1_file.split('-')[1].split('.jpg')[0]
+    date2 = im2_file.split('-')[1].split('.jpg')[0]
+    savename = '-'.join([file_base,date1,date2,
+                        kwparams['FEATURES'],
+                        'kNN'+str(kwparams['KNEAREST']),
+                        'prox'+str(kwparams['MATCH_PROXIMITY_IN_PIXELS']),
+                        'thresh'+str(kwparams['MATCH_PROBABILITY_THRESHOLD']),
+                        'nbhd'+str(kwparams['MATCH_NEIGHBORHOOD_IN_PIXELS']),
+                        'ct'+str(ct_threshold),
+                        'ct_nbhd'+str(ct_nbhd_size),
+                        'agged.png'])
+    cv2.imwrite(savename,agg_image)
+        
 
 if __name__ == '__main__':
+    """Example: python bulk_detect.py 'dim1000test/CCclearcutsdim1000-2010.jpg'    'dim1000test/CCclearcutsdim1000-2012.jpg' 'dim1000test'
+    """
+    CT_THRESHOLD_FRAC = .01
+    CT_NBHD_SIZE = 100
+    params = dict(FEATURES = 'KAZE',
+                    KAZE_PARAMETER = 0.0003,
+                    KNEAREST = 5,
+                    MATCH_PROXIMITY_IN_PIXELS = 4,
+                    CALCULATE_PROXIMITY_LIMIT = False,
+                    MATCH_NEIGHBORHOOD_IN_PIXELS = 40,
+                    MATCH_PROBABILITY_THRESHOLD = 1e-8)
     image_dir = sys.argv[3]  # dir name should not include trailing /
-    detect_change(sys.argv[1].split(image_dir+'/')[1],
-                  sys.argv[2].split(image_dir+'/')[1],
-                  RelDir=sys.argv[3])
+    im1_file = sys.argv[1].split(image_dir+'/')[1]
+    im2_file = sys.argv[2].split(image_dir+'/')[1]
+    im2_color, changepoints, total_kps = detect_change(im1_file,im2_file,
+                                            RelDir=sys.argv[3],**params)
+    agg_image = agglomerate(im2_color,changepoints,
+                            CT_NBHD_SIZE,
+                                total_kps*CT_THRESHOLD_FRAC)
+    write_agg_im(im1_file,im2_file,agg_image,CT_NBHD_SIZE,
+                                total_kps*CT_THRESHOLD_FRAC,**params)
