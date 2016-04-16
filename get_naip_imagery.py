@@ -14,13 +14,19 @@ import os
 # params
 YEAR1 = 2010
 YEAR2 = 2012
-DIM = 256
-COUNTY_INDEX = 5
-NUMBER_OF_LOCATIONS_PER_COUNTY = 6
+COUNTY_INDEX = 25
+NUMBER_OF_LOCATIONS_PER_COUNTY = 10
+# for 1m res
+#URL_PREFIX = 'waterapp'
+#DIM = 256
+# for dim1000
+URL_PREFIX = 'genome'
+DIM = 1000
 
 # api info
 API_BASE_COORDS = 'http://genome.enviro-service.appspot.com/land/validation'
-API_BASE_IMAGERY = 'http://waterapp.enviro-service.appspot.com/imagery/naip'
+API_BASE_IMAGERY = ('http://'+URL_PREFIX+
+    '.enviro-service.appspot.com/imagery/naip')
 
 landuse_types = ['cropland-natural vegetation mosaic','urban and built-up','evergreen needleleaf forest','closed shrublands','deciduous broadleaf forest','grasslands','snow and ice','mixed forest','water','open shrublands','savannas','croplands','permanent wetlands','barren or sparsely vegetated','woody savannas','deciduous needleleaf forest','evergreen broadleaf forest']
 
