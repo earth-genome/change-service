@@ -360,7 +360,7 @@ def agglomerate(image,changepoints,nbhd_size,ct_threshold):
     alpha_mask[ct_image > ct_threshold] = FULL_OPACITY
     return np.dstack((image,alpha_mask))
 
-def write_agg_im(agg_image,ct_nbhd_size,ct_threshold,im1_file,im2_file,
+def write_agg_im(agg_image,ct_nbhd_size,ct_threshold,im1_file,im2_file,RelDir,
                  **kwparams):
     """Write the agg image to file."""
     file_base = im2_file.split('-')[0]
@@ -375,14 +375,19 @@ def write_agg_im(agg_image,ct_nbhd_size,ct_threshold,im1_file,im2_file,
                         'ct'+str(ct_threshold),
                         'ct_nbhd'+str(ct_nbhd_size),
                         'agged.png'])
-    cv2.imwrite(savename,agg_image)
+    im1_color = cv2.imread(os.path.join(RelDir, im1_file),1)
+    im2_color = cv2.imread(os.path.join(RelDir, im2_file),1)
+    blank_mask = np.ones(im1_color.shape[:2],dtype=int)*255
+    im1_masked = np.dstack((im1_color,blank_mask))
+    im2_masked = np.dstack((im2_color,blank_mask))
+    cv2.imwrite(savename,np.hstack((im1_masked,im2_masked,agg_image)))
         
 
 if __name__ == '__main__':
     """Example: python bulk_detect.py 'dim1000test/CCclearcutsdim1000-2010.jpg'    'dim1000test/CCclearcutsdim1000-2012.jpg' 'dim1000test'
     """
     CT_THRESHOLD_FRAC = .01
-    CT_NBHD_SIZE = 100
+    CT_NBHD_SIZE = 120
     params = dict(FEATURES = 'KAZE',
                     KAZE_PARAMETER = 0.0003,
                     KNEAREST = 5,
@@ -398,5 +403,5 @@ if __name__ == '__main__':
     agg_image = agglomerate(im2_color,changepoints,
                             CT_NBHD_SIZE,
                                 total_kps*CT_THRESHOLD_FRAC)
-    write_agg_im(im1_file,im2_file,agg_image,CT_NBHD_SIZE,
-                                total_kps*CT_THRESHOLD_FRAC,**params)
+    write_agg_im(agg_image,CT_NBHD_SIZE,total_kps*CT_THRESHOLD_FRAC,
+                 im1_file,im2_file,RelDir=sys.argv[3],**params)

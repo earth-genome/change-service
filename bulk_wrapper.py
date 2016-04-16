@@ -58,5 +58,6 @@ if __name__ == '__main__':
                                 CT_NBHD_SIZE,
                                 total_kps*CT_THRESHOLD_FRAC)
         bulk_detect.write_agg_im(agg_image,CT_NBHD_SIZE,
-                                total_kps*CT_THRESHOLD_FRAC,*p,**params)
+                                total_kps*CT_THRESHOLD_FRAC,
+                                *p,RelDir=relDir,**params)
     
