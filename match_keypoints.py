@@ -15,17 +15,15 @@ import scipy.stats
 from scipy.optimize import curve_fit
 from scipy.misc import factorial
 
-import matplotlib.pyplot as plt
-
-
 # global parameters
-MATCH_PROXIMITY_IN_PIXELS = 4              # empirical
+MATCH_PROXIMITY_IN_PIXELS = 12              # empirical
 KAZE_PARAMETER = 0.0003                 	# empirical
 #KAZE_PARAMETER = 0.001
+K_NEAREST = 5                                # empirical
 FLANN_KDTREE_INDEX = 0                  	# definition
 FLANN_TREE_NUMBER = 5                       # empirical
 FLANN_SEARCH_DEPTH = 50                 	# empirical
-IMAGE_WIDTH = 400                           # expected image width
+IMAGE_WIDTH = 512                           # expected image width
 
 def _gaussian(x,a,x0,sigma):
     # Defines a gaussian function for curve fitting
@@ -147,11 +145,13 @@ def _calculate_proximity_threshold(offsets,num_sigma=3):
     lam_guess = np.argmax(offsets)
     a_guess = offsets[lam_guess]
     y0_guess = offsets[-1]
-    print("Poisson guesses: a = {0}, lam = {1}".format(a_guess,lam_guess))
     popt,pcov = curve_fit(_poisson,xdat,offsets,[a_guess,lam_guess,y0_guess])
-    print("Poisson fit: {0}".format(popt))
+    return int(4*popt[2])   # rough guess; should eventually test inverse CDF or something
 
-    return popt   # should eventually test inverse CDF or something
+def _smooth_image(im,size=3):
+    # apply gaussian blur to image for smoothing
+
+    return cv2.GaussianBlur(im,(size,size),0)
 
 
 # main
@@ -172,19 +172,22 @@ parser.add_argument('date2', type=str, help='Second image file date.')
 args = parser.parse_args()
 
 # load image files [note grayscale: 0; color: 1]
-im1 = cv2.imread(args.image_1_filename,0)
+im1_raw = cv2.imread(args.image_1_filename,0)
 im1_color = cv2.imread(args.image_1_filename,1)
-im2 = cv2.imread(args.image_2_filename,0)
+im2_raw = cv2.imread(args.image_2_filename,0)
 im2_color = cv2.imread(args.image_2_filename,1)
+
+# smooth images
+im1 = _smooth_image(im1_raw)
+im2 = _smooth_image(im2_raw)
 
 # instantiate global OpenCV objects
 #SIFT = cv2.xfeatures2d.SIFT_create()        # use default features
-#BFMATCH = cv2.BFMatcher()
+BFMATCH = cv2.BFMatcher()
 KAZE = cv2.KAZE_create(threshold = KAZE_PARAMETER)
-index_parameters = dict(algorithm = FLANN_KDTREE_INDEX, trees = FLANN_TREE_NUMBER)
-search_parameters = dict(checks=FLANN_SEARCH_DEPTH)
-FLANN = cv2.FlannBasedMatcher(index_parameters,search_parameters)
-#AKAZE = cv2.AKAZE_create(threshold= KAZE_PARAMETER)
+#index_parameters = dict(algorithm = FLANN_KDTREE_INDEX, trees = FLANN_TREE_NUMBER)
+#search_parameters = dict(checks=FLANN_SEARCH_DEPTH)
+#FLANN = cv2.FlannBasedMatcher(index_parameters,search_parameters)
 
 # find keypints and descriptors
 #kps1,desc1 = SIFT.detectAndCompute(im1,None)
@@ -197,25 +200,18 @@ print 'Found {0} kps in im1'.format(len(kps1))
 print 'Found {0} kps in im2'.format(len(kps2))
 
 # find 2-way matches
-match_candidates = FLANN.match(desc1,desc2)
-#match_candidates = BFMATCH.match(desc1,desc2)
+#match_candidates = FLANN.match(desc1,desc2)
+match_candidates = BFMATCH.match(desc1,desc2)
 print 'Found {0} match candidates...'.format(len(match_candidates))
 
 # do proximity test
 match_offsets = _calculate_offsets_between_matches(kps1,kps2,match_candidates)
-
-# show match offset histogram and poisson match
-_show_offset_histogram_and_poisson(match_offsets,im_size=IMAGE_WIDTH)
-
-
 proximity_in_pixels = _calculate_proximity_threshold(match_offsets)
-offsets_histogram = _make_offsets_histogram(match_offsets,MATCH_PROXIMITY_IN_PIXELS)
-
-#MATCH_PROXIMITY_IN_PIXELS = proximity_in_pixels
+offsets_histogram = _make_offsets_histogram(match_offsets,proximity_in_pixels)
 matches = [
-	m for m in match_candidates if _are_close(kps1[m.queryIdx],kps2[m.trainIdx],MATCH_PROXIMITY_IN_PIXELS)
+	m for m in match_candidates if _are_close(kps1[m.queryIdx],kps2[m.trainIdx],proximity_in_pixels)
 ]
-print '...of which {0} are within the proximity limit of {1} pixels.'.format(len(matches),MATCH_PROXIMITY_IN_PIXELS)
+print '...of which {0} are within the proximity limit of {1} pixels.'.format(len(matches),proximity_in_pixels)
 kps1_matched = [kps1[m.queryIdx] for m in matches]
 kps2_matched = [kps2[m.trainIdx] for m in matches]
 kps1_unmatched = set(kps1) - set(kps1_matched)
@@ -227,6 +223,20 @@ N_kps2 = len(kps2)
 N_matches = len(matches)
 match_rate_1 = N_matches/float(N_kps1)           #  average match rate for im1
 match_rate_2 = N_matches/float(N_kps2)           #  average match rate for im2
+
+# REDO proximity test using KNN matching
+match_candidates_k = BFMATCH.knnMatch(desc1,desc2,k=K_NEAREST)
+print 'Found {0} match candidates with kNN...'.format(len(match_candidates_k))
+matches_k = []
+for knnlist in match_candidates_k:
+    for m in knnlist:
+        if _are_close(kps1[m.queryIdx],kps2[m.trainIdx],proximity_in_pixels):
+            matches_k.append(m)
+            break
+print '...of which {0} are within the proximity limit of {1} pixels.'.format(len(matches_k),proximity_in_pixels)
+kps1_matched = [kps1[m.queryIdx] for m in matches_k]
+kps2_matched = [kps2[m.trainIdx] for m in matches_k]
+
 
 # OUTPUT
 
@@ -262,7 +272,7 @@ cv2.putText(text_box,label_string,label_origin,1,1.0,black_color)
 label_string = "Matched keypoints: {0}".format(len(kps2_matched))
 label_origin = (20,60)
 cv2.putText(text_box,label_string,label_origin,1,1.0,match_color)
-label_string = "KAZE (0.0003); proximity test @ {0} pixels; FLANN".format(MATCH_PROXIMITY_IN_PIXELS)
+label_string = "KAZE (0.0003); proximity test @ {0} pixels; FLANN".format(proximity_in_pixels)
 label_origin = (20,80)
 cv2.putText(text_box,label_string,label_origin,1,1.0,black_color)
 

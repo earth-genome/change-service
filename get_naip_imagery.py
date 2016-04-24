@@ -14,13 +14,22 @@ import json
 import os
 
 # params
-BASE_LAT, BASE_LONG = 37.314,-121.948				# san jose
-#BASE_LONG = -121.948			# san jose
+#BASE_LAT, BASE_LONG = 37.314,-121.948				# san jose
+#BASE_LAT, BASE_LONG = 37.307, -120.477				# merced
+#BASE_LAT, BASE_LONG = 33.802, -118.340				# los angeles
+#BASE_LAT, BASE_LONG = 38.444, -123.125				# jenner
+#BASE_LAT, BASE_LONG = 39.103, -121.648				# yuba
+#BASE_LAT, BASE_LONG = 32.580, -117.090				# sanysidro
+#BASE_LAT, BASE_LONG = 37.770, -122.447				# san francisco - don't use, too much Bay water
+#BASE_LAT, BASE_LONG = 38.215, -122.662				# petaluma
+BASE_LAT, BASE_LONG = 37.805, -122.295				# oakland
 DELTA_LAT, DELTA_LONG = 0.02, 0.03
-NUMBER_OF_STEPS = 4   	# will grab this many images squared times 2 (for 2010, 2012)
+NUMBER_OF_STEPS = 8   	# will grab this many images squared times 2 (for 2010, 2012)
+DIMENSION = 1000
 
 # api info
-API_BASE_IMAGERY = 'http://waterapp.enviro-service.appspot.com/imagery/naip'
+#API_BASE_IMAGERY = 'http://waterapp.enviro-service.appspot.com/imagery/naip'
+API_BASE_IMAGERY = 'http://genome.enviro-service.appspot.com/imagery/naip'
 
 # read args
 parser = argparse.ArgumentParser(description='Download NAIP imagery.')
@@ -29,8 +38,6 @@ parser.add_argument('save_location', type=str, help='Directory to save imagery.'
 parser.add_argument('log_file', type=str, help='Filename to log images downloaded.')
 args = parser.parse_args()
 
-# build payload and make call for imagery
-
 # make save directory if necessary
 if not os.path.exists(args.save_location):
 	os.makedirs(args.save_location)
@@ -38,6 +45,7 @@ if not os.path.exists(args.save_location):
 # open log file
 f_log = open(args.log_file,'a')
 
+# build payload and make call for imagery
 for i in range(NUMBER_OF_STEPS):
 	mylat = BASE_LAT + i * DELTA_LAT
 	for j in range(NUMBER_OF_STEPS):
@@ -46,13 +54,14 @@ for i in range(NUMBER_OF_STEPS):
 		payload = {}
 		payload['lon'] = mylong
 		payload['lat'] = mylat
-		payload['dimension'] = 200
+		payload['dimension'] = DIMENSION
 		payload['year'] = 2010			# do 2010 first
+		payload['color'] = 'rgb'
 		url_payload = urllib.urlencode(payload)
 		full_url = API_BASE_IMAGERY + '?' + url_payload
 		response = urllib2.urlopen(full_url)
 		image = response.read()
-		filename = "{}{:0>3d}-2010.jpg".format(args.prefix_name,num)	# pad num with zeros to 3 digits
+		filename = "{}{:0>3d}-2010.png".format(args.prefix_name,num+1)	# pad num with zeros to 3 digits
 		save_path = os.path.join(args.save_location,filename)
 		with open(save_path,'wb') as f:
 			f.write(image)
@@ -65,7 +74,7 @@ for i in range(NUMBER_OF_STEPS):
 		full_url = API_BASE_IMAGERY + '?' + url_payload
 		response = urllib2.urlopen(full_url)
 		image = response.read()
-		filename = "{}{:0>3d}-2012.jpg".format(args.prefix_name,num)	# pad num with zeros to 3 digits
+		filename = "{}{:0>3d}-2012.png".format(args.prefix_name,num+1)	# pad num with zeros to 3 digits
 		save_path = os.path.join(args.save_location,filename)
 		with open(save_path,'wb') as f:
 			f.write(image)
