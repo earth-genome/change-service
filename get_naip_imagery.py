@@ -20,9 +20,9 @@ import os
 #BASE_LAT, BASE_LONG = 38.444, -123.125				# jenner
 #BASE_LAT, BASE_LONG = 39.103, -121.648				# yuba
 #BASE_LAT, BASE_LONG = 32.580, -117.090				# sanysidro
-#BASE_LAT, BASE_LONG = 37.770, -122.447				# san francisco - don't use, too much Bay water
 #BASE_LAT, BASE_LONG = 38.215, -122.662				# petaluma
 BASE_LAT, BASE_LONG = 37.805, -122.295				# oakland
+
 DELTA_LAT, DELTA_LONG = 0.02, 0.03
 NUMBER_OF_STEPS = 8   	# will grab this many images squared times 2 (for 2010, 2012)
 DIMENSION = 1000

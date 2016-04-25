@@ -1,16 +1,15 @@
 """ test_binomial.py
 Test whether keypoints are binomially distributed throughout an image.
 :params:
-: image_directory: Directory where images are saved (assumes PNG format)
-: log_file: Filename for log
+: image_file: Filename of image
+: save_file: Filename for saved K-S graph
 """
 
 import argparse
 import numpy as np
 import cv2
 import scipy.stats
-#import matplotlib.pyplot as plt
-import os
+import matplotlib.pyplot as plt
 
 # global parameters
 NUMBER_OF_PATCHES_WIDE = 20
@@ -73,84 +72,68 @@ def _prepare_image(im,kps):
 
 # read args
 parser = argparse.ArgumentParser(description='Test whether keypoints are binomially distributed.')
-parser.add_argument('image_directory', type=str, help='Path to directory where images are saved.')
-parser.add_argument('log_file', type=str, help='Filename to log results.')
+parser.add_argument('image_file', type=str, help='Image filename.')
+parser.add_argument('save_file', type=str, help='Filename to save result.')
 args = parser.parse_args()
-
-# open log file
-f_log = open(args.log_file,'a')
 
 # instantiate KAZE object
 KAZE = cv2.KAZE_create(threshold = KAZE_PARAMETER)
 
-# process each image in image_directory
-for im_filename in os.listdir(args.image_directory):
-    # try to load image file [note grayscale: 0; color: 1]
-    if '.png' not in im_filename:
-        continue
-    try:
-        im_raw = cv2.imread(os.path.join(args.image_directory,im_filename),0)
-    except:
-        print("Could not load file {0}, skipping.".format(image))
-        continue
+# try to load image file [note grayscale: 0; color: 1]
+im_raw = cv2.imread(args.image_file,0)
+IMAGE_HEIGHT, IMAGE_WIDTH = im_raw.shape[0], im_raw.shape[1]
+print("Image width: {0}; image height: {1}".format(IMAGE_WIDTH,IMAGE_HEIGHT))
+PATCH_WIDTH = IMAGE_WIDTH / NUMBER_OF_PATCHES_WIDE
+PATCH_HEIGHT = IMAGE_HEIGHT / NUMBER_OF_PATCHES_HIGH
+print("Patch size: {0} wide, {1} high".format(PATCH_WIDTH,PATCH_HEIGHT))
 
-    IMAGE_HEIGHT, IMAGE_WIDTH = im_raw.shape[0], im_raw.shape[1]
-    #print("Image width: {0}; image height: {1}".format(IMAGE_WIDTH,IMAGE_HEIGHT))
-    PATCH_WIDTH = IMAGE_WIDTH / NUMBER_OF_PATCHES_WIDE
-    PATCH_HEIGHT = IMAGE_HEIGHT / NUMBER_OF_PATCHES_HIGH
-    #print("Patch size: {0} wide, {1} high".format(PATCH_WIDTH,PATCH_HEIGHT))
+# discard edges of image that are outside patch grid
+trimmed_width = PATCH_WIDTH * NUMBER_OF_PATCHES_WIDE
+trimmed_height = PATCH_HEIGHT * NUMBER_OF_PATCHES_HIGH
+im = np.zeros((trimmed_height,trimmed_width),dtype='uint8')
+im[:,:] = im_raw[0:trimmed_height,0:trimmed_width]
+print("Trimmed image to width: {0}, height: {1}".format(trimmed_width,trimmed_height))
 
-    # discard edges of image that are outside patch grid
-    trimmed_width = PATCH_WIDTH * NUMBER_OF_PATCHES_WIDE
-    trimmed_height = PATCH_HEIGHT * NUMBER_OF_PATCHES_HIGH
-    im = np.zeros((trimmed_height,trimmed_width),dtype='uint8')
-    im[:,:] = im_raw[0:trimmed_height,0:trimmed_width]
-    #print("Trimmed image to width: {0}, height: {1}".format(trimmed_width,trimmed_height))
+# detect keypoints
+kps = KAZE.detect(im,None)
+print 'Found {0} kps in image'.format(len(kps))
 
-    # detect keypoints
-    kps = KAZE.detect(im,None)
-    #print 'Found {0} kps in image'.format(len(kps))
+# count keypoints in each neighborhood/patch
+kp_count = _count_keypoints_in_each_neighborhood(kps,im)
 
-    # count keypoints in each neighborhood/patch
-    kp_count = _count_keypoints_in_each_neighborhood(kps,im)
-    if kp_count.sum() <= MIN_KP_COUNT:
-        print("Skipping {0}, too few keypoints.".format(im_filename))
-        continue
+# calculate theoretical binomial CDF
+count_vals, binom_cdf = _calculate_binom_cdf(kp_count)
 
-    # calculate theoretical binomial CDF
-    count_vals, binom_cdf = _calculate_binom_cdf(kp_count)
+# calculate CDF for keypoints
+bin_edges = np.arange(kp_count.max()+1)
+kp_hist, bin_edges = np.histogram(kp_count,bin_edges,density=True)
+kp_cdf = np.cumsum(kp_hist)
 
-    # calculate CDF for keypoints
-    bin_edges = np.arange(kp_count.max()+1)
-    kp_hist, bin_edges = np.histogram(kp_count,bin_edges,density=True)
-    kp_cdf = np.cumsum(kp_hist)
+# calculate K-S statistic
+ks_stat = _calculate_ks_statistic(kp_cdf,binom_cdf)
+print("K-S statistic: {0}".format(ks_stat))
 
-    # calculate K-S statistic
-    ks_stat = _calculate_ks_statistic(kp_cdf,binom_cdf)
-    #print("K-S statistic: {0}".format(ks_stat))
-
-    # print output
-    print("File: {0}, N_kps: {1}, K-S stat: {2}".format(im_filename,len(kps),ks_stat))
-    log_string = "{0}, {1}, {2}\n".format(im_filename,len(kps), ks_stat)
-    f_log.write(log_string)
-
-f_log.close()
-print("Finished")
+# print output
+print("File: {0}, N_kps: {1}, K-S stat: {2}".format(args.image_file,len(kps),ks_stat))
 
 # build figure 
-#fig = plt.figure(figsize=(16,6))
+fig = plt.figure(figsize=(5,3.5))
 
 # plot keypoints-per-patch histogram and expected pmf
 #ax1 = fig.add_subplot(1,2,1)
-#ax1.plot(count_vals+0.5, kp_cdf,'bx')
-#ax1.plot(count_vals+0.5, binom_cdf,'ro')     # offset x vals by 0.5 to center point on bar
-#ax1.set_xlabel("Keypoints in patch")
-#ax1.set_ylabel("Cumulative fraction of patches")
+ax1 = fig.add_subplot(1,1,1)
+ax1.plot(count_vals+0.5, kp_cdf,'bs')
+ax1.plot(count_vals+0.5, binom_cdf,'ro')     # offset x vals by 0.5 to center point on bar
+ax1.set_xlabel("Keypoints in patch")
+ax1.set_ylabel("Cumulative fraction of patches")
 
 # add image with keypoints
 #im_drawn = _prepare_image(im,kps)
 #ax2 = fig.add_subplot(1,2,2)
 #ax2.imshow(im_drawn)
 
+# save
+fig.savefig(args.save_file, bbox_inches='tight')
+
 # display    
-#plt.show()
+plt.show()
