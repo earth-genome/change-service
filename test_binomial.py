@@ -16,7 +16,7 @@ import os
 NUMBER_OF_PATCHES_WIDE = 20
 NUMBER_OF_PATCHES_HIGH = 20
 KAZE_PARAMETER = 0.0003                 	# empirical
-MIN_KP_COUNT = 500
+MIN_KP_COUNT = 1
 keypoint_color = (255,0,0)
 
 def _count_keypoints_in_each_neighborhood(kps,im):
