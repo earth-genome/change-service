@@ -13,7 +13,7 @@ import os
 
 # global parameters
 NUMBER_OF_PATCHES_WIDE = 20
-NUMBER_OF_PATCHES_HIGH = 20
+NUMBER_OF_PATCHES_HIGH = 16
 KAZE_PARAMETER = 0.0003                 	# empirical
 MIN_KP_COUNT = 1
 keypoint_color = (255,0,0)
@@ -47,7 +47,6 @@ def _calculate_binom_cdf(kp_count):
     max_count = kp_count.max()
     num_keypoints = kp_count.sum()
     prob = np.mean(kp_count) / float(num_keypoints)
-
     count_vals = np.arange(max_count)
     cdf_vals = scipy.stats.binom.cdf(count_vals,num_keypoints,prob)
 
