@@ -16,31 +16,14 @@ NUMBER_OF_PATCHES_WIDE = 20
 NUMBER_OF_PATCHES_HIGH = 16
 KAZE_PARAMETER = 0.0003                 	# empirical
 MIN_KP_COUNT = 1
-keypoint_color = (255,0,0)
 
 def _count_keypoints_in_each_neighborhood(kps,im):
     # count keypoints in each patch defined by NUMBER_OF_PATCHES_{WIDE/HIGH}
     kp_count = np.zeros([NUMBER_OF_PATCHES_WIDE,NUMBER_OF_PATCHES_HIGH])
     for kp in kps:
-        kp_count[kp.pt[0]/PATCH_WIDTH,kp.pt[1]/PATCH_HEIGHT] += 1
+        kp_count[kp.pt[1]/PATCH_WIDTH,kp.pt[0]/PATCH_HEIGHT] += 1
 
     return kp_count.flatten()
-
-def _calculate_keypoint_count_pmf(kp_count):
-    # calculate properties of kp_count distribution
-    max_count = kp_count.max()
-    num_keypoints = kp_count.sum()
-    prob = np.mean(kp_count) / float(num_keypoints)
-
-    # calculate expected binomial pmf
-    count_vals = np.arange(max_count)
-    pmf_vals = NUMBER_OF_PATCHES_HIGH * NUMBER_OF_PATCHES_WIDE * scipy.stats.binom.pmf(count_vals,num_keypoints,prob)
-
-    # calculate chi-squared
-    kp_count_histogram = np.histogram(kp_count,max_count+1)[0]
-    chi2,p = scipy.stats.chisquare(kp_count_histogram,pmf_vals)
-
-    return pmf_vals,chi2,p
 
 def _calculate_binom_cdf(kp_count):
     # calculate the CDF of a binomial distribution with the properties of kp_count
@@ -56,16 +39,6 @@ def _calculate_ks_statistic(kp_cdf,binom_cdf):
     # calculate Kolmogorov-Smirnov statistic
     ks_vals = abs(kp_cdf - binom_cdf)
     return ks_vals.max()
-
-def _prepare_image(im,kps):
-    # draw grid lines and keypoints on image
-    im_out = im.copy()
-    for x in np.arange(NUMBER_OF_PATCHES_WIDE):
-        im[:,x*PATCH_WIDTH] = 0
-    for y in np.arange(NUMBER_OF_PATCHES_HIGH):
-        im[y*PATCH_HEIGHT,:] = 0
-    cv2.drawKeypoints(im,kps,im_out,color=keypoint_color,flags=0)
-    return im_out
 
 # main
 
@@ -92,15 +65,15 @@ for im_filename in os.listdir(args.image_directory):
         print("Could not load file {0}, skipping.".format(image))
         continue
 
-    IMAGE_HEIGHT, IMAGE_WIDTH = im_raw.shape[0], im_raw.shape[1]
+    IMAGE_WIDTH, IMAGE_HEIGHT = im_raw.shape[0], im_raw.shape[1]
     PATCH_WIDTH = IMAGE_WIDTH / NUMBER_OF_PATCHES_WIDE
     PATCH_HEIGHT = IMAGE_HEIGHT / NUMBER_OF_PATCHES_HIGH
 
     # discard edges of image that are outside patch grid
     trimmed_width = PATCH_WIDTH * NUMBER_OF_PATCHES_WIDE
     trimmed_height = PATCH_HEIGHT * NUMBER_OF_PATCHES_HIGH
-    im = np.zeros((trimmed_height,trimmed_width),dtype='uint8')
-    im[:,:] = im_raw[0:trimmed_height,0:trimmed_width]
+    im = np.zeros((trimmed_width,trimmed_height),dtype='uint8')
+    im[:,:] = im_raw[0:trimmed_width,0:trimmed_height]
 
     # detect keypoints
     kps = KAZE.detect(im,None)

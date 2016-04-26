@@ -23,6 +23,7 @@ args = parser.parse_args()
 kp_and_ks_numbers = np.genfromtxt(args.log_file, delimiter=',',usecols=(1,2))
 kp_numbers = kp_and_ks_numbers[:,0]
 ks_vals = kp_and_ks_numbers[:,1]
+fig = plt.figure(figsize=(9,5))
 plt.scatter(kp_numbers,ks_vals)
 plt.xlim(0,6000)
 plt.ylim(0,0.6)
