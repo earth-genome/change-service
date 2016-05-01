@@ -18,23 +18,23 @@ of validation of the change masks against image labels.
 
 Help:
 $python bulk_wrapper.py -h
-usage: bulk_wrapper.py [-h] [--labeled_dir LABELED_DIR] pairs_dir
+usage: bulk_wrapper.py [-h] [-l LABELED_DIR] pairs_dir
 
 Detect change between image pairs.
 
 positional arguments:
-  pairs_dir             Directory containing image pairs.
+  pairs_dir             directory containing image pairs - no trailing /
 
 optional arguments:
   -h, --help            show this help message and exit
-  -l, --labeled_dir LABELED_DIR
-                        Directory containing labeled images.
+  -l LABELED_DIR, --labeled_dir LABELED_DIR
+                        directory containing labeled images
 
-Set parameters by editing defaults, top of bulk_wrapper.py
+Set parameters by editing defaults, top of bulk_wrapper.py.
 
 Examples:
 1) $ python bulk_wrapper.py 'dim1000test/'
-2) $ python bulk_wrapper.py 'dim1000practice' 'dim1000practice-labeled'
+2) $ python bulk_wrapper.py 'dim1000practice' -l 'dim1000practice-labeled'
 """
 
 import sys
@@ -142,17 +142,13 @@ def write_agg_images(agg_image,agg_bin,ct_nbhd_size,ct_threshold,
     return
 
 if __name__ == '__main__':
-    change_params = default_change_params
-    agg_params = default_agg_params
-
     parser = argparse.ArgumentParser(
         description='Detect change between image pairs.',
-        epilog='Set parameters by editing defaults, top of bulk_wrapper.py')
+        epilog='Set parameters by editing defaults, top of bulk_wrapper.py.')
     parser.add_argument('pairs_dir', type=str,
-                        help='Directory containing image pairs.')
+                    help='directory containing image pairs - no trailing /')
     parser.add_argument('-l', '--labeled_dir', type=str,
-                        help='Directory containing labeled images.')
-
+                        help='directory containing labeled images')
     # WIP: For now adjust default_change_params, default_agg_params above
     """
     parser.add_argument('--FEATURES', action='store_const',
@@ -168,11 +164,17 @@ if __name__ == '__main__':
     parser.add_argument('--CT_NBHD_SIZE', default=120)
     """
     args = parser.parse_args()
+    change_params = default_change_params
+    agg_params = default_agg_params
+    
     image_files = sort_file_names(args.pairs_dir)
-    output_dir = args.pairs_dir + '-changepts'
+    pairs_basename = os.path.basename(args.pairs_dir)
+    output_dir = generate_save_name(pairs_basename,
+                                    **change_params) + '-changepts'
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-    agg_dir = args.pairs_dir + '-agged'
+    agg_dir = generate_save_name(pairs_basename,
+                                 **change_params) + '-agged'
     if not os.path.exists(agg_dir):
         os.makedirs(agg_dir)
 
