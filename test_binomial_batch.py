@@ -62,7 +62,7 @@ for im_filename in os.listdir(args.image_directory):
     try:
         im_raw = cv2.imread(os.path.join(args.image_directory,im_filename),0)
     except:
-        print("Could not load file {0}, skipping.".format(image))
+        print("Could not load file {0}, skipping.".format(im_filename))
         continue
 
     IMAGE_WIDTH, IMAGE_HEIGHT = im_raw.shape[0], im_raw.shape[1]

@@ -1,22 +1,17 @@
-""" match_keypoints.py
+""" match_keypoints_batch.py
 Detect and match keypoints between two images.
-Arguments:
-- filename1: First image file
-- filename2: Second image file
-- filename3: Filename to save results
-- date1: First image file date string
-- date2: Second image file date string
+:params:
+: image_directory: Directory where images are saved (assumes PNG format)
+: log_file: Filename for log
 """
 
 import argparse
 import numpy as np
 import cv2
+import os
 import scipy.stats
 from scipy.optimize import curve_fit
 from scipy.misc import factorial
-from scipy.special import gammaln
-import random
-import matplotlib.pyplot as plt
 
 # global parameters
 MATCH_PROXIMITY_IN_PIXELS = 8              # empirical
@@ -34,9 +29,7 @@ def _gaussian(x,a,x0,sigma):
 
 def _poisson(x,a,y0,lam):
     # Defines a poisson distribution for curve fitting
-    #return y0 + a * np.exp(-lam) * lam**x / factorial(x)
-
-    return y0 + a * np.exp(x * np.log(lam) - lam - gammaln(x+1))
+    return y0 + a * np.exp(-lam) * lam**x / factorial(x)
 
 def _are_close(kpa,kpb,distance):
 	# Returns true if keypoints are separated by less than distance
@@ -151,20 +144,10 @@ def _calculate_proximity_threshold(offsets,num_sigma=3):
     a_guess = offsets[lam_guess]
     y0_guess = offsets[-1]
     popt,pcov = curve_fit(_poisson,xdat,offsets,[a_guess,lam_guess,y0_guess])
-    print("Fit: {0}".format(popt))
-    print("Std dev error: {0}".format(np.sqrt(np.diag(pcov))))
-    return int(4*popt[2])   # rough guess; should eventually test inverse CDF or something
-
-def _plot_matches(im1,im2,kps1,kps2,matches):
-
-    im_out = np.concatenate((im1,im2),axis=1)
-    cols = im1.shape[1]
-    for m in matches:
-        pt1 = (int(kps1[m.queryIdx].pt[0]),int(kps1[m.queryIdx].pt[1]))
-        pt2 = (int(kps2[m.trainIdx].pt[0]+cols),int(kps2[m.trainIdx].pt[1]))
-        color = (random.randint(0,255),random.randint(0,255),random.randint(0,255))
-        cv2.line(im_out,pt1,pt2,color=color)
-    return im_out
+    if popt[2] > 0:
+        return int(8*popt[2])   # rough guess; should eventually test inverse CDF or something
+    else:
+        return MATCH_PROXIMITY_IN_PIXELS
 
 # main
 
@@ -176,128 +159,88 @@ marker_color = (255,0,0)
 
 # read args
 parser = argparse.ArgumentParser(description='Match keypoints between two images.')
-parser.add_argument('image_1_filename', type=str, help='First image file name.')
-parser.add_argument('image_2_filename', type=str, help='Second image file name.')
-parser.add_argument('save_image_filename', type=str, help='Path to save output file.')
-parser.add_argument('date1', type=str, help='First image file date.')
-parser.add_argument('date2', type=str, help='Second image file date.')
+parser.add_argument('image_directory', type=str, help='Directory in which images are saved.')
+parser.add_argument('log_file', type=str, help='Log file.')
 args = parser.parse_args()
 
-# load image files [note grayscale: 0; color: 1]
-im1 = cv2.imread(args.image_1_filename,0)
-im1_color = cv2.imread(args.image_1_filename,1)
-im2 = cv2.imread(args.image_2_filename,0)
-im2_color = cv2.imread(args.image_2_filename,1)
+# open log file
+f_log = open(args.log_file,'a')
 
 # instantiate global OpenCV objects
-#SIFT = cv2.xfeatures2d.SIFT_create()        # use default features
+SIFT = cv2.xfeatures2d.SIFT_create()        # use default features
 BFMATCH = cv2.BFMatcher(crossCheck=True)
 KAZE = cv2.KAZE_create(threshold = KAZE_PARAMETER)
 #index_parameters = dict(algorithm = FLANN_KDTREE_INDEX, trees = FLANN_TREE_NUMBER)
 #search_parameters = dict(checks=FLANN_SEARCH_DEPTH)
 #FLANN = cv2.FlannBasedMatcher(index_parameters,search_parameters)
 
-# find keypints and descriptors
-#kps1,desc1 = SIFT.detectAndCompute(im1,None)
-#kps2,desc2 = SIFT.detectAndCompute(im2,None)
-kps1,desc1 = KAZE.detectAndCompute(im1,None)
-kps2,desc2 = KAZE.detectAndCompute(im2,None)
-print 'Found {0} kps in im1'.format(len(kps1))
-print 'Found {0} kps in im2'.format(len(kps2))
+# process each image in image_directory
+for im_filename in os.listdir(args.image_directory):
 
-# find 2-way matches
-#match_candidates = FLANN.match(desc1,desc2)
-match_candidates = BFMATCH.match(desc1,desc2)
-print 'Found {0} match candidates...'.format(len(match_candidates))
-#matches = match_candidates
+    # only look at image files 
+    # trigger comparison starting with 2010 image only
+    if '.png' not in im_filename or '2010' not in im_filename:
+        continue    
 
-# do proximity test
-match_offsets = _calculate_offsets_between_matches(kps1,kps2,match_candidates)
-proximity_in_pixels = _calculate_proximity_threshold(match_offsets)
-print("Proximity threshold = {0}".format(proximity_in_pixels))
-offsets_histogram = _make_offsets_histogram(match_offsets,proximity_in_pixels)
-#proximity_in_pixels = MATCH_PROXIMITY_IN_PIXELS
-matches = [
-	m for m in match_candidates if _are_close(kps1[m.queryIdx],kps2[m.trainIdx],proximity_in_pixels)
-]
-print '...of which {0} are within the proximity limit of {1} pixels.'.format(len(matches),proximity_in_pixels)
-kps1_matched = [kps1[m.queryIdx] for m in matches]
-kps2_matched = [kps2[m.trainIdx] for m in matches]
-#kps1_unmatched = set(kps1) - set(kps1_matched)
-#kps2_unmatched = set(kps2) - set(kps2_matched)
+    try:
+        im1 = cv2.imread(os.path.join(args.image_directory,im_filename),0)
+        im_filename_2012 = im_filename.replace('2010','2012')
+        im2 = cv2.imread(os.path.join(args.image_directory,im_filename_2012),0)
+    except:
+        print("Could not load file {0}, skipping.".format(im_filename))
+        continue
 
-# calculate average match rate for each image
-N_kps1 = len(kps1)
-N_kps2 = len(kps2)
-N_matches = len(matches)
-#match_rate_1 = N_matches/float(N_kps1)           #  average match rate for im1
-#match_rate_2 = N_matches/float(N_kps2)           #  average match rate for im2
-average_match_rate = 2*N_matches/float(N_kps1+N_kps2)
-print("Average match rate: {0}".format(average_match_rate))
+    # detect keypoints and descriptors
+    #kps1,desc1 = SIFT.detectAndCompute(im1,None)
+    #kps2,desc2 = SIFT.detectAndCompute(im2,None)
+    kps1,desc1 = KAZE.detectAndCompute(im1,None)
+    kps2,desc2 = KAZE.detectAndCompute(im2,None)
 
-_show_offset_histogram_and_poisson(match_offsets)
+    # find 2-way matches
+    match_candidates = BFMATCH.match(desc1,desc2)
+    #match_candidates = FLANN.match(desc1,desc2)
 
-"""
-# REDO proximity test using KNN matching
-match_candidates_k = BFMATCH.knnMatch(desc1,desc2,k=K_NEAREST)
-print 'Found {0} match candidates with kNN...'.format(len(match_candidates_k))
-matches_k = []
-for knnlist in match_candidates_k:
-    for m in knnlist:
-        if _are_close(kps1[m.queryIdx],kps2[m.trainIdx],proximity_in_pixels):
-            matches_k.append(m)
-            break
-print '...of which {0} are within the proximity limit of {1} pixels.'.format(len(matches_k),proximity_in_pixels)
-kps1_matched = [kps1[m.queryIdx] for m in matches_k]
-kps2_matched = [kps2[m.trainIdx] for m in matches_k]
-"""
+    # do proximity test
+    #match_offsets = _calculate_offsets_between_matches(kps1,kps2,match_candidates)
+    #proximity_in_pixels = _calculate_proximity_threshold(match_offsets)
+    #offsets_histogram = _make_offsets_histogram(match_offsets,proximity_in_pixels)
+    proximity_in_pixels = MATCH_PROXIMITY_IN_PIXELS
+    matches = [
+        m for m in match_candidates if _are_close(kps1[m.queryIdx],kps2[m.trainIdx],proximity_in_pixels)
+    ]
+    #matches = match_candidates
+    #kps1_matched = [kps1[m.queryIdx] for m in matches]
+    #kps2_matched = [kps2[m.trainIdx] for m in matches]
+    #kps1_unmatched = set(kps1) - set(kps1_matched)
+    #kps2_unmatched = set(kps2) - set(kps2_matched)
 
-# OUTPUT
+    # calculate average match rate 
+    N_kps1 = len(kps1)
+    N_kps2 = len(kps2)
+    N_matches = len(matches)
+    #match_rate_1 = N_matches/float(N_kps1)           #  average match rate for im1
+    #match_rate_2 = N_matches/float(N_kps2)           #  average match rate for im2
+    average_match_rate = 2*N_matches/float(N_kps1+N_kps2)
 
-# prepare output image
-im1_out = im1_color.copy()
-im2_out = im2_color.copy()
-cv2.drawKeypoints(im1_color,kps1_matched,im1_out,color=match_color,flags=0)
-cv2.drawKeypoints(im2_color,kps2_matched,im2_out,color=match_color,flags=0)
-#cv2.drawKeypoints(im1_out,kps1_unmatched,im1_out,color=non_match_color,flags=0)
-#cv2.drawKeypoints(im2_out,kps2_unmatched,im2_out,color=non_match_color,flags=0)
+    """
+    # REDO proximity test using KNN matching
+    match_candidates_k = BFMATCH.knnMatch(desc1,desc2,k=K_NEAREST)
+    print 'Found {0} match candidates with kNN...'.format(len(match_candidates_k))
+    matches_k = []
+    for knnlist in match_candidates_k:
+        for m in knnlist:
+            if _are_close(kps1[m.queryIdx],kps2[m.trainIdx],proximity_in_pixels):
+                matches_k.append(m)
+                break
+    print '...of which {0} are within the proximity limit of {1} pixels.'.format(len(matches_k),proximity_in_pixels)
+    kps1_matched = [kps1[m.queryIdx] for m in matches_k]
+    kps2_matched = [kps2[m.trainIdx] for m in matches_k]
+    """
 
-im_combined = np.concatenate((im1_out,im2_out),axis=1)
-#im_combined = _plot_matches(im1_out,im2_out,kps1,kps2,matches)
-#im_combined = cv2.drawMatches(im1_out,kps1,im2_out,kps2,matches)
+    # print output
+    log_string = "{0}, {1}, {2}, {3}, {4}".format(im_filename,N_kps1,N_kps2,N_kps1+N_kps2,average_match_rate)
+    print log_string + ", " + str(proximity_in_pixels)
+    f_log.write(log_string+'\n')
 
-# calculate histogram and plot
-#local_keypoint_histogram = _plot_local_keypoint_histogram(kps2_local_histogram,kps1_local_histogram)
-local_keypoint_histogram = offsets_histogram 
-hist_plots = np.concatenate((offsets_histogram,local_keypoint_histogram),axis=1)
-
-# make label box
-text_box_height = 10 + 20 * 4
-text_box = 255 * np.ones((text_box_height,2*IMAGE_WIDTH,3),np.uint8)
-
-label_string = args.date1
-label_origin = (20,20)
-cv2.putText(text_box,label_string,label_origin,1,1.0,black_color)
-label_string = args.date2
-label_origin = (20+IMAGE_WIDTH,20)
-cv2.putText(text_box,label_string,label_origin,1,1.0,black_color)
-label_string = "Keypoints: {0}".format(len(kps1))
-label_origin = (20,40)
-cv2.putText(text_box,label_string,label_origin,1,1.0,black_color)
-label_string = "Keypoints: {0}".format(len(kps2))
-label_origin = (20+IMAGE_WIDTH,40)
-cv2.putText(text_box,label_string,label_origin,1,1.0,black_color)
-label_string = "Matched keypoints: {0}".format(len(kps2_matched))
-label_origin = (20,60)
-cv2.putText(text_box,label_string,label_origin,1,1.0,match_color)
-label_string = "KAZE (0.0003); proximity test @ {0} pixels; BFMatch".format(proximity_in_pixels)
-#label_string = "SIFT, BFMatch (cross-check), proximity test: {0}".format(proximity_in_pixels)
-label_origin = (20,80)
-cv2.putText(text_box,label_string,label_origin,1,1.0,black_color)
-
-# join label to bottom of image pair and save
-#im_A = np.concatenate((im1_out,im2_out),axis=1)
-im_A = im_combined
-im_B = np.concatenate((im_A,text_box),axis=0)
-im_C = np.concatenate((im_B,hist_plots),axis=0)
-cv2.imwrite(args.save_image_filename,im_C)
+f_log.close()
+print("Finished")
