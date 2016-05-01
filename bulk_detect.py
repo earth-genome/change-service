@@ -1,17 +1,19 @@
 """ Work towards streamlining detect_changes.py for bulk runs.
 
 External function: detect_change()
-    Arguments with defaults as of 4/5/16:
+    Arguments (current defaults are set in bulk_wrapper.py):
                   im1_file,
                   im2_file,
-                    RelDir = '.',   #path from pwd to image directory
-                    FEATURES='KAZE',
-                    KAZE_PARAMETER = 0.001,
-                    KNEAREST = 5,
-                    MATCH_PROXIMITY_IN_PIXELS = 4,
-                    CALCULATE_PROXIMITY_LIMIT = False, # overrides prev.
-                    MATCH_NEIGHBORHOOD_IN_PIXELS = 40,
-                    MATCH_PROBABILITY_THRESHOLD = 1e-10
+                    RelDir,   #path from pwd to image directory
+                    output_dir,
+                    **kwparams to include:
+                    FEATURES,
+                    KAZE_PARAMETER,
+                    KNEAREST,
+                    MATCH_PROXIMITY_IN_PIXELS,
+                    CALCULATE_PROXIMITY_LIMIT, # overrides prev.
+                    MATCH_NEIGHBORHOOD_IN_PIXELS,
+                    MATCH_PROBABILITY_THRESHOLD
 
     Assumptions:
     -- im1_file and im2_file have the same shape.
@@ -22,7 +24,8 @@ External function: detect_change()
     Output: An image file with the two images, change points, and
     parameters displayed.
 
-    Example: detect_change(losangeles005-2010.jpg,losangeles005-2012.jpg)
+    Example: detect_change(losangeles005-2010.jpg,losangeles005-2012.jpg,
+        **bulk_wrapper.default_change_params)
 
     
 """
@@ -33,6 +36,8 @@ import cv2
 import scipy.stats
 import scipy.signal
 import pdb
+
+import bulk_wrapper
 
 # set up color choices
 black_color = (0,0,0)
@@ -156,16 +161,17 @@ def _are_close(kpa,kpb,distance):
     else:
         return False
     
-def detect_change(im1_file,
-                  im2_file,
-                  RelDir = '.',
-                    FEATURES='KAZE',
-                    KAZE_PARAMETER = 0.0003,
-                    KNEAREST = 5,
-                    MATCH_PROXIMITY_IN_PIXELS = 4,
-                    CALCULATE_PROXIMITY_LIMIT = False,
-                    MATCH_NEIGHBORHOOD_IN_PIXELS = 40,
-                    MATCH_PROBABILITY_THRESHOLD = 1e-8):
+def detect_change(im1_file, im2_file, RelDir, output_dir,**kwparams):
+    """Detect change between two input images."""
+
+    # to comply with legacy variable naming
+    FEATURES = kwparams['FEATURES']
+    KAZE_PARAMETER = kwparams['KAZE_PARAMETER']
+    KNEAREST = kwparams['KNEAREST']
+    MATCH_PROXIMITY_IN_PIXELS = kwparams['MATCH_PROXIMITY_IN_PIXELS']
+    CALCULATE_PROXIMITY_LIMIT = kwparams['CALCULATE_PROXIMITY_LIMIT']
+    MATCH_NEIGHBORHOOD_IN_PIXELS = kwparams['MATCH_NEIGHBORHOOD_IN_PIXELS']
+    MATCH_PROBABILITY_THRESHOLD = kwparams['MATCH_PROBABILITY_THRESHOLD']
 
     # load image files [note grayscale: 0; color: 1]
     im1_file_relpath = os.path.join(RelDir, im1_file)
@@ -177,19 +183,11 @@ def detect_change(im1_file,
     IMAGE_WIDTH = im1.shape[1]
     #file1 = im1_file.split(RelDir+'/')[1]
     #file2 = im2_file.split(RelDir+'/')[1]
-    file_base = im1_file.split('-')[0]
-    date1 = im1_file.split('-')[1].split('.jpg')[0]
-    date2 = im2_file.split('-')[1].split('.jpg')[0]
-    save_image_filename = '-'.join([file_base,
-                                    date1,
-                                    date2,
-                                    FEATURES,
-                                    'kNN'+str(KNEAREST),
-                                    'prox'+str(MATCH_PROXIMITY_IN_PIXELS),
-                                    'thresh'+str(MATCH_PROBABILITY_THRESHOLD),
-                                    'KAZEpar'+str(KAZE_PARAMETER),
-                                    'nbhd'+str(MATCH_NEIGHBORHOOD_IN_PIXELS),
-                                    '.jpg'])
+    file_base = im2_file.split('-')[0]
+    date1, date2 = bulk_wrapper.get_dates(im1_file,im2_file)
+    save_image_filename = bulk_wrapper.generate_save_name(
+        file_base+'-'+date1+date2,**kwparams)
+    save_image_filename += '.jpg'
 
     # instantiate global OpenCV objects
     BFMATCH = cv2.BFMatcher()
@@ -338,70 +336,18 @@ def detect_change(im1_file,
     im_B = np.concatenate((im_A,text_box),axis=0)
     im_C = np.concatenate((im_B,hist_plots),axis=0)
     print save_image_filename
-    cv2.imwrite(save_image_filename,im_C)
+    cv2.imwrite(os.path.join(output_dir,save_image_filename),im_C)
 
-    return im2_color, kps1_changed + kps2_changed, (len(kps1)+len(kps2))/2.
-
-def agglomerate(image,changepoints,nbhd_size,ct_threshold):
-    """Count the number of changepoints on each nbhd_size square, and
-    threshold the count by ct_threshold.  Returns an image with alpha
-    mask of full or half opacity, according to whether the neighborhood
-    centered on the point does or does not meet the ct_threshold. """
-
-    OPACITY = 63 # alpha channel, on a scale 0-255
-    FULL_OPACITY = 255
-    ct_kernel = np.ones((nbhd_size,nbhd_size))    
-    changepoints_image = np.zeros(image.shape[:2],dtype=int)
-    for kp in changepoints:
-        changepoints_image[kp.pt[1],kp.pt[0]] = 1
-    ct_image = scipy.signal.fftconvolve(changepoints_image,ct_kernel,
-                                        mode='same')
-    alpha_mask = np.ones(image.shape[:2],dtype=int)*OPACITY
-    alpha_mask[ct_image > ct_threshold] = FULL_OPACITY
-    return np.dstack((image,alpha_mask))
-
-def write_agg_im(agg_image,ct_nbhd_size,ct_threshold,im1_file,im2_file,RelDir,
-                 **kwparams):
-    """Write the agg image to file."""
-    file_base = im2_file.split('-')[0]
-    date1 = im1_file.split('-')[1].split('.jpg')[0]
-    date2 = im2_file.split('-')[1].split('.jpg')[0]
-    savename = '-'.join([file_base,date1,date2,
-                        kwparams['FEATURES'],
-                        'kNN'+str(kwparams['KNEAREST']),
-                        'prox'+str(kwparams['MATCH_PROXIMITY_IN_PIXELS']),
-                        'thresh'+str(kwparams['MATCH_PROBABILITY_THRESHOLD']),
-                        'nbhd'+str(kwparams['MATCH_NEIGHBORHOOD_IN_PIXELS']),
-                        'ct'+str(ct_threshold),
-                        'ct_nbhd'+str(ct_nbhd_size),
-                        'agged.png'])
-    im1_color = cv2.imread(os.path.join(RelDir, im1_file),1)
-    im2_color = cv2.imread(os.path.join(RelDir, im2_file),1)
-    blank_mask = np.ones(im1_color.shape[:2],dtype=int)*255
-    im1_masked = np.dstack((im1_color,blank_mask))
-    im2_masked = np.dstack((im2_color,blank_mask))
-    cv2.imwrite(savename,np.hstack((im1_masked,im2_masked,agg_image)))
-        
+    return kps1_changed + kps2_changed, (len(kps1)+len(kps2))/2.
 
 if __name__ == '__main__':
-    """Example: python bulk_detect.py 'dim1000test/CCclearcutsdim1000-2010.jpg'    'dim1000test/CCclearcutsdim1000-2012.jpg' 'dim1000test'
+    """Ex: python bulk_detect.py 'dim1000test/CCclearcutsdim1000-2010.jpg'
+       'dim1000test/CCclearcutsdim1000-2012.jpg'
     """
-    CT_THRESHOLD_FRAC = .01
-    CT_NBHD_SIZE = 120
-    params = dict(FEATURES = 'KAZE',
-                    KAZE_PARAMETER = 0.0003,
-                    KNEAREST = 5,
-                    MATCH_PROXIMITY_IN_PIXELS = 4,
-                    CALCULATE_PROXIMITY_LIMIT = False,
-                    MATCH_NEIGHBORHOOD_IN_PIXELS = 40,
-                    MATCH_PROBABILITY_THRESHOLD = 1e-8)
-    image_dir = sys.argv[3]  # dir name should not include trailing /
-    im1_file = sys.argv[1].split(image_dir+'/')[1]
-    im2_file = sys.argv[2].split(image_dir+'/')[1]
-    im2_color, changepoints, total_kps = detect_change(im1_file,im2_file,
-                                            RelDir=sys.argv[3],**params)
-    agg_image = agglomerate(im2_color,changepoints,
-                            CT_NBHD_SIZE,
-                                total_kps*CT_THRESHOLD_FRAC)
-    write_agg_im(agg_image,CT_NBHD_SIZE,total_kps*CT_THRESHOLD_FRAC,
-                 im1_file,im2_file,RelDir=sys.argv[3],**params)
+    im1_file = os.path.basename(sys.argv[1])
+    im2_file = os.path.basename(sys.argv[2])
+    dir_name = os.path.dirname(sys.argv[2])
+    detect_change(im1_file,im2_file,dir_name,
+                  **bulk_wrapper.default_change_params)
+    
+
