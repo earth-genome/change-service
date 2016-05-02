@@ -49,13 +49,13 @@ import bulk_detect
 import validation
 
 # defaults as of 5/1/16
-default_change_params = dict(FEATURES = 'KAZE',
+default_change_params = dict(FEATURES = 'SIFT',
                     KAZE_PARAMETER = 0.0003,
                     KNEAREST = 5,
                     MATCH_PROXIMITY_IN_PIXELS = 4,
                     CALCULATE_PROXIMITY_LIMIT = False,
                     MATCH_NEIGHBORHOOD_IN_PIXELS = 40,
-                    MATCH_PROBABILITY_THRESHOLD = 1e-8)
+                    MATCH_PROBABILITY_THRESHOLD = 1e-6)
 default_agg_params = dict(CT_THRESHOLD_FRAC = .01,
                       CT_NBHD_SIZE = 120)
 
@@ -82,12 +82,12 @@ def get_dates(*filenames):
 def generate_save_name(base_name,**params):
     """Generate a string recording base_name and key parameters."""
     save_name = '-'.join([base_name,
-                        params['FEATURES'],
-                        'KAZEpar'+str(params['KAZE_PARAMETER']),
-                        'kNN'+str(params['KNEAREST']),
-                        'prox'+str(params['MATCH_PROXIMITY_IN_PIXELS']),
-                        'nbhd'+str(params['MATCH_NEIGHBORHOOD_IN_PIXELS']),
-                        'thresh'+str(params['MATCH_PROBABILITY_THRESHOLD'])])
+                params['FEATURES'],
+                #'KAZEpar'+str(params['KAZE_PARAMETER']),
+                'kNN'+str(params['KNEAREST']),
+                'prox'+str(params['MATCH_PROXIMITY_IN_PIXELS']),
+                'nbhd'+str(params['MATCH_NEIGHBORHOOD_IN_PIXELS']),
+                'thr{:.0e}'.format(params['MATCH_PROBABILITY_THRESHOLD'])])
     return save_name
     
 def agglomerate(changepoints,ct_nbhd_size,ct_threshold,
@@ -142,6 +142,8 @@ def write_agg_images(agg_image,agg_bin,ct_nbhd_size,ct_threshold,
     return
 
 if __name__ == '__main__':
+    change_params = default_change_params
+    agg_params = default_agg_params
     parser = argparse.ArgumentParser(
         description='Detect change between image pairs.',
         epilog='Set parameters by editing defaults, top of bulk_wrapper.py.')
@@ -149,6 +151,7 @@ if __name__ == '__main__':
                     help='directory containing image pairs - no trailing /')
     parser.add_argument('-l', '--labeled_dir', type=str,
                         help='directory containing labeled images')
+    parser.add_argument('-t','--thresh', help='Match probability threshold.')
     # WIP: For now adjust default_change_params, default_agg_params above
     """
     parser.add_argument('--FEATURES', action='store_const',
@@ -159,22 +162,25 @@ if __name__ == '__main__':
     parser.add_argument('--MATCH_PROXIMITY_IN_PIXELS', default=4)
     parser.add_argument('--CALCULATE_PROXIMITY_LIMIT', action='store_true')
     parser.add_argument('--MATCH_NEIGHBORHOOD_IN_PIXELS', default=40)
-    parser.add_argument('--MATCH_PROBABILITY_THRESHOLD', default=1e-8)
     parser.add_argument('--CT_THRESHOLD_FRAC', default=.01)
     parser.add_argument('--CT_NBHD_SIZE', default=120)
     """
     args = parser.parse_args()
-    change_params = default_change_params
-    agg_params = default_agg_params
+    if args.thresh is not None:
+        change_params['MATCH_PROBABILITY_THRESHOLD'] = args.thresh
     
     image_files = sort_file_names(args.pairs_dir)
     pairs_basename = os.path.basename(args.pairs_dir)
-    output_dir = generate_save_name(pairs_basename,
-                                    **change_params) + '-changepts'
+    output_dir = (generate_save_name(pairs_basename,**change_params) +
+        '-ctfrac{}'.format(agg_params['CT_THRESHOLD_FRAC']) +
+        'ctnbhd{:d}'.format(agg_params['CT_NBHD_SIZE']) +
+        '-changepts')
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-    agg_dir = generate_save_name(pairs_basename,
-                                 **change_params) + '-agged'
+    agg_dir = (generate_save_name(pairs_basename,**change_params) +
+        '-ctfrac{}'.format(agg_params['CT_THRESHOLD_FRAC']) +
+        'ctnbhd{:d}'.format(agg_params['CT_NBHD_SIZE']) +
+        '-agged')
     if not os.path.exists(agg_dir):
         os.makedirs(agg_dir)
 

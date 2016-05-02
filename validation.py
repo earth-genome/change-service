@@ -64,8 +64,9 @@ def validate(change_img,labeled_img):
         elif np.max(change_bin*label_bin) == 1:
             result = 'true positive'
         else:
-            result = 'missed detection'
-    return result
+            result = 'erroneous detection'
+    label = 'change' if label_max else 'no change'
+    return result, label
 
 def tabulate(change_dir,labeled_dir):
     """Run through directories of change detections and labeled images
@@ -90,25 +91,38 @@ def tabulate(change_dir,labeled_dir):
     # count and log the validation results
     logfile = open(change_dir+'/'+change_dir+'-valid.log','a')
     totals = {result:0 for result in ['true positive','true negative',
-        'false positive','false negative', 'missed detection']}
+        'false positive','false negative', 'erroneous detection']}
+    label_totals = {label:0 for label in ['no change','change']}
     for p in pairs:
         cf = cv2.imread(change_dir+'/'+p[0],0)
         lf = cv2.imread(labeled_dir+'/'+p[1],1)
-        result = validate(cf,lf)
+        result, label = validate(cf,lf)
         totals[result] += 1
+        label_totals[label] += 1
         logfile.write('Image {}: {}\n'.format(p[0],result))
     logfile.write('\nFrom {} images, we have: {}\n'.format(len(pairs),
                                                              totals))
     print 'From {} images, we have: {}\n'.format(len(pairs),totals)
-    fractrue = (totals['true positive']
+    totalaccuracy = (totals['true positive']
                 + totals['true negative'])/float(len(pairs))
-    fracfalse = (totals['false positive']
-                + totals['false negative']
-                + totals['missed detection'])/float(len(pairs))
-    logfile.write('Fraction correct, ' +
-        'incorrect: {}, {}\n--- ---\n\n'.format(fractrue,fracfalse))
-    print 'Fraction correct, incorrect: {}, {}\n'.format(fractrue,
-                                                            fracfalse)      
+    try: 
+        posrate = totals['true positive']/float(label_totals['change'])
+    except ZeroDivisionError:
+        posrate = None
+    try:
+        negrate = totals['true negative']/float(label_totals['no change'])
+    except ZeroDivisionError:
+        negrate = None
+    logfile.write('Total accuracy: {:.4f}, Correct positive rate: {}, Correct negative rate: {}\n'.format(totalaccuracy,posrate,negrate))
+    print('Total accuracy: {:.4f}, Correct positive rate: {}, Correct negative rate: {}\n'.format(totalaccuracy,posrate,negrate))
+
+    try:
+        tpfpratio = totals['true positive']/float(totals['false positive'])
+    except ZeroDivisionError:
+        tpfpratio = None
+    logfile.write('Ratio of true to false positives: {}\n--- ---\n\n'.format(tpfpratio))
+    print('Ratio of true to false positives: {}\n--- ---\n\n'.format(tpfpratio))
+        
     logfile.close()
     return
 
