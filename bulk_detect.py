@@ -160,6 +160,42 @@ def _are_close(kpa,kpb,distance):
         return True
     else:
         return False
+
+def _calculate_homography(matches,kp1,kp2):
+    """Determine the optimal homography transform between matches
+    using a RANSAC-based estimator.
+    """
+    src_pts = np.float32([kp1[m.queryIdx].pt
+                              for m in matches]).reshape(-1,1,2)
+    dst_pts = np.float32([kp2[m.trainIdx].pt
+                              for m in matches]).reshape(-1,1,2)
+    H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC,5.0)
+    return H, mask
+
+def _homography_distance(pt1,pt2,H):
+    """After applying homography transform H to pt1, determine its
+    distance from pt2.
+    """ 
+    # augmented coordinates
+    aug1 = np.array((pt1[0],pt1[1],1))
+    aug2 = np.array((pt2[0],pt2[1],1))
+    dist = np.linalg.norm(np.dot(H,aug1) - aug2)
+    return dist
+
+def _compute_distance(pt1,pt2):
+    """Compute the L2 distance between pt1 and pt2."""
+    dist = np.linalg.norm(np.array(pt1)-np.array(pt2))
+    return dist
+
+def _check_homography(pt1,pt2,H,radius):
+    """Determine whether the homography transform H on pt1 is within
+    the given radius of pt2.
+    """
+    dist = _homography_distance(pt1,pt2,H)
+    if dist < radius:
+        return True
+    else:
+        return False
     
 def detect_change(im1_file, im2_file, RelDir, output_dir,**kwparams):
     """Detect change between two input images."""
@@ -170,8 +206,10 @@ def detect_change(im1_file, im2_file, RelDir, output_dir,**kwparams):
     KNEAREST = kwparams['KNEAREST']
     MATCH_PROXIMITY_IN_PIXELS = kwparams['MATCH_PROXIMITY_IN_PIXELS']
     CALCULATE_PROXIMITY_LIMIT = kwparams['CALCULATE_PROXIMITY_LIMIT']
+    HOMOGRAPHY = kwparams['HOMOGRAPHY']
     MATCH_NEIGHBORHOOD_IN_PIXELS = kwparams['MATCH_NEIGHBORHOOD_IN_PIXELS']
     MATCH_PROBABILITY_THRESHOLD = kwparams['MATCH_PROBABILITY_THRESHOLD']
+    STATS_TEST = kwparams['STATS_TEST']
 
     # load image files [note grayscale: 0; color: 1]
     im1_file_relpath = os.path.join(RelDir, im1_file)
@@ -222,12 +260,25 @@ def detect_change(im1_file, im2_file, RelDir, output_dir,**kwparams):
         proximity_limit = MATCH_PROXIMITY_IN_PIXELS
 # 
     matches = []
-    for knnlist in match_candidates:
-        for m in knnlist:
-            if _are_close(kps1[m.queryIdx],kps2[m.trainIdx],
+
+    if HOMOGRAPHY == True:
+        H, mask = _calculate_homography(top_match_candidates,kps1,kps2)
+        print 'Estimated homography transformation:'
+        print H
+        for knnlist in match_candidates:
+            for m in knnlist:
+                if _check_homography(kps1[m.queryIdx].pt,kps2[m.trainIdx].pt,
+                                     H,radius=proximity_limit):
+                    matches.append(m)
+                    break
+    else:
+        for knnlist in match_candidates:
+            for m in knnlist:
+                if _are_close(kps1[m.queryIdx],kps2[m.trainIdx],
                       proximity_limit):
-                matches.append(m)
-                break
+                    matches.append(m)
+                    break
+                
     print '...of which {0} are within the proximity limit of {1} pixels.'.format(len(matches),proximity_limit)
     kps1_matched = [kps1[m.queryIdx] for m in matches]
     kps2_matched = [kps2[m.trainIdx] for m in matches]
@@ -251,10 +302,20 @@ def detect_change(im1_file, im2_file, RelDir, output_dir,**kwparams):
         kps2_local_histogram[len(local_kps)] += 1    
 
     # do statistical test for each un-matched keypoint
-        local_kp_rate = len(local_kps)/float(N_kps2)
-        if scipy.stats.binom.cdf(len(local_matches),N_matches,
-                    local_kp_rate) < MATCH_PROBABILITY_THRESHOLD:
-            kps2_changed.append(kp)
+        if STATS_TEST == 'PBYKPRATE':
+            local_kp_rate = len(local_kps)/float(N_kps2)
+            if scipy.stats.binom.cdf(len(local_matches),N_matches,
+                        local_kp_rate) < MATCH_PROBABILITY_THRESHOLD:
+                kps2_changed.append(kp)
+        elif STATS_TEST == 'MATCHKPRATIO':
+            if scipy.stats.binom.cdf(len(local_matches),len(local_kps),
+                                 match_rate_2) < MATCH_PROBABILITY_THRESHOLD:
+                kps2_changed.append(kp)
+        elif STATS_TEST == 'PBYMATCHRATE':
+            local_match_rate = len(local_matches)/float(N_matches)
+            if scipy.stats.binom.sf(len(local_kps),N_kps2,
+                        local_match_rate) < MATCH_PROBABILITY_THRESHOLD:
+                kps2_changed.append(kp)
 
     print 'Found {0} change keypoints (forward direction)'.format(len(kps2_changed))
 
@@ -269,11 +330,21 @@ def detect_change(im1_file, im2_file, RelDir, output_dir,**kwparams):
         kps1_local_histogram[len(local_kps)] += 1    
 
     # do statistical test for each un-matched keypoint
-        local_kp_rate = len(local_kps)/float(N_kps1)
-        if scipy.stats.binom.cdf(len(local_matches),N_matches,
-                    local_kp_rate) < MATCH_PROBABILITY_THRESHOLD:
-            kps1_changed.append(kp)
-
+        if STATS_TEST == 'PBYKPRATE':
+            local_kp_rate = len(local_kps)/float(N_kps1)
+            if scipy.stats.binom.cdf(len(local_matches),N_matches,
+                        local_kp_rate) < MATCH_PROBABILITY_THRESHOLD:
+                kps1_changed.append(kp)
+        elif STATS_TEST == 'MATCHKPRATIO':
+            if scipy.stats.binom.cdf(len(local_matches),len(local_kps),
+                                 match_rate_1) < MATCH_PROBABILITY_THRESHOLD:
+                kps1_changed.append(kp)
+        elif STATS_TEST == 'PBYMATCHRATE':
+            local_match_rate = len(local_matches)/float(N_matches)
+            if scipy.stats.binom.sf(len(local_kps),N_kps1,
+                        local_match_rate) < MATCH_PROBABILITY_THRESHOLD:
+                kps1_changed.append(kp)
+                
     print 'Found {0} change keypoints (backward direction)'.format(len(kps1_changed))
 
     # prepare output image

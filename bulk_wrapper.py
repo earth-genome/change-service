@@ -49,13 +49,15 @@ import bulk_detect
 import validation
 
 # defaults as of 5/1/16
-default_change_params = dict(FEATURES = 'SIFT',
+default_change_params = dict(FEATURES = 'KAZE',
                     KAZE_PARAMETER = 0.0003,
                     KNEAREST = 5,
                     MATCH_PROXIMITY_IN_PIXELS = 4,
                     CALCULATE_PROXIMITY_LIMIT = False,
+                    HOMOGRAPHY = False,
                     MATCH_NEIGHBORHOOD_IN_PIXELS = 40,
-                    MATCH_PROBABILITY_THRESHOLD = 1e-6)
+                    MATCH_PROBABILITY_THRESHOLD = 1e-16,
+                    STATS_TEST = 'PBYMATCHRATE')
 default_agg_params = dict(CT_THRESHOLD_FRAC = .01,
                       CT_NBHD_SIZE = 120)
 
@@ -83,11 +85,18 @@ def generate_save_name(base_name,**params):
     """Generate a string recording base_name and key parameters."""
     save_name = '-'.join([base_name,
                 params['FEATURES'],
-                #'KAZEpar'+str(params['KAZE_PARAMETER']),
                 'kNN'+str(params['KNEAREST']),
                 'prox'+str(params['MATCH_PROXIMITY_IN_PIXELS']),
                 'nbhd'+str(params['MATCH_NEIGHBORHOOD_IN_PIXELS']),
                 'thr{:.0e}'.format(params['MATCH_PROBABILITY_THRESHOLD'])])
+    if params['KAZE_PARAMETER'] != 0.0003:
+        save_name += 'KAZEpar'+str(params['KAZE_PARAMETER'])
+    if params['CALCULATE_PROXIMITY_LIMIT'] == True:
+        save_name += 'calcproxlim'
+    if params['HOMOGRAPHY'] == True:
+        save_name += 'homog'
+    if params['STATS_TEST'] != 'PBYKPRATE':
+        save_name += params['STATS_TEST']
     return save_name
     
 def agglomerate(changepoints,ct_nbhd_size,ct_threshold,
