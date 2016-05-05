@@ -12,24 +12,24 @@ import os
 import scipy.stats
 from scipy.optimize import curve_fit
 from scipy.misc import factorial
+from scipy.stats import poisson
 
 # global parameters
-MATCH_PROXIMITY_IN_PIXELS = 8              # empirical
-KAZE_PARAMETER = 0.0003                 	# empirical
-#KAZE_PARAMETER = 0.001
-K_NEAREST = 5                                # empirical
-FLANN_KDTREE_INDEX = 0                  	# definition
-FLANN_TREE_NUMBER = 5                       # empirical
-FLANN_SEARCH_DEPTH = 50                 	# empirical
-IMAGE_WIDTH = 512                           # expected image width
+FEATURES = ("SIFT", "KAZE")[0]              # choose feature type
+DYNAMIC_PROXIMITY_TEST = False              # select fixed or dynamic proximity test
+KAZE_PARAMETER = 0.0003                     # empirical
+MATCH_PROXIMITY_IN_PIXELS = 2               # empirical
+K_NEAREST = 5                               # empirical
+IMAGE_WIDTH = 512
 
 def _gaussian(x,a,x0,sigma):
     # Defines a gaussian function for curve fitting
     return a * np.exp(-(x-x0)**2/(2*sigma**2))
 
-def _poisson(x,a,y0,lam):
+def _poisson(x,a,y0,mu):
     # Defines a poisson distribution for curve fitting
-    return y0 + a * np.exp(-lam) * lam**x / factorial(x)
+    #return y0 + a * np.exp(-mu) * mu**x / factorial(x)
+    return y0 + a * poisson.pmf(x,mu)
 
 def _are_close(kpa,kpb,distance):
 	# Returns true if keypoints are separated by less than distance
@@ -124,38 +124,22 @@ def _plot_local_keypoint_histogram(kp_histogram_forward,kp_histogram_backward,im
     plot_box[:,-1,:] = (0,0,0)      # edge divider
     return plot_box
 
-def _calculate_proximity_threshold(offsets,num_sigma=3):
+def _calculate_proximity_threshold(offsets):
     # Calculates the optimum proximity threshold
-    # Starts by fitting histogram of match offsets to a gaussian
-    # The threshold is the center of the gaussian fit, plus num_sigma * sigma
-    # Note the means we don't cut off matches that are at short distances; small effect
-    # NOTE: Currently trying a possion fit instead of gaussian
 
-    xdat = np.arange(len(offsets))
-    
-    # gaussian version
-    #x0_guess = np.argmax(offsets)        
-    #sigma_guess = 2     # empirical
-    #popt,pcov = curve_fit(_gaussian,xdat,offsets,[a_guess,x0_guess,sigma_guess])
-    #return int(popt[1] + num_sigma * popt[2])
-
-    # poisson version
-    lam_guess = np.argmax(offsets)
-    a_guess = offsets[lam_guess]
+    xvals = np.arange(len(offsets))
+    mu_guess = np.argmax(offsets)
+    a_guess = offsets[mu_guess]
     y0_guess = offsets[-1]
-    popt,pcov = curve_fit(_poisson,xdat,offsets,[a_guess,lam_guess,y0_guess])
-    if popt[2] > 0:
-        return int(8*popt[2])   # rough guess; should eventually test inverse CDF or something
+    popt,pcov = curve_fit(_poisson,xvals,offsets,[a_guess,mu_guess,y0_guess])
+    if popt[1] > 0:
+        max_distance = int(poisson.interval(0.99,popt[1])[-1])
+        fit_converged = 1
     else:
-        return MATCH_PROXIMITY_IN_PIXELS
+        max_distance = MATCH_PROXIMITY_IN_PIXELS
+        fit_converged = 0
+    return max_distance, fit_converged
 
-# main
-
-# set up color choices
-black_color = (0,0,0)
-match_color = (0,255,0)
-non_match_color = (0,0,255)
-marker_color = (255,0,0)
 
 # read args
 parser = argparse.ArgumentParser(description='Match keypoints between two images.')
@@ -167,18 +151,16 @@ args = parser.parse_args()
 f_log = open(args.log_file,'a')
 
 # instantiate global OpenCV objects
-SIFT = cv2.xfeatures2d.SIFT_create()        # use default features
 BFMATCH = cv2.BFMatcher(crossCheck=True)
-KAZE = cv2.KAZE_create(threshold = KAZE_PARAMETER)
-#index_parameters = dict(algorithm = FLANN_KDTREE_INDEX, trees = FLANN_TREE_NUMBER)
-#search_parameters = dict(checks=FLANN_SEARCH_DEPTH)
-#FLANN = cv2.FlannBasedMatcher(index_parameters,search_parameters)
+if FEATURES == "SIFT":
+    SIFT = cv2.xfeatures2d.SIFT_create()       
+elif FEATURES == "KAZE":
+    KAZE = cv2.KAZE_create(threshold = KAZE_PARAMETER)
 
 # process each image in image_directory
 for im_filename in os.listdir(args.image_directory):
 
-    # only look at image files 
-    # trigger comparison starting with 2010 image only
+    # only look at image files; trigger comparison starting with 2010 image only
     if '.png' not in im_filename or '2010' not in im_filename:
         continue    
 
@@ -191,56 +173,43 @@ for im_filename in os.listdir(args.image_directory):
         continue
 
     # detect keypoints and descriptors
-    #kps1,desc1 = SIFT.detectAndCompute(im1,None)
-    #kps2,desc2 = SIFT.detectAndCompute(im2,None)
-    kps1,desc1 = KAZE.detectAndCompute(im1,None)
-    kps2,desc2 = KAZE.detectAndCompute(im2,None)
+    if FEATURES == "SIFT":
+        kps1,desc1 = SIFT.detectAndCompute(im1,None)
+        kps2,desc2 = SIFT.detectAndCompute(im2,None)
+    elif FEATURES == "KAZE":
+        kps1,desc1 = KAZE.detectAndCompute(im1,None)
+        kps2,desc2 = KAZE.detectAndCompute(im2,None)
 
     # find 2-way matches
     match_candidates = BFMATCH.match(desc1,desc2)
-    #match_candidates = FLANN.match(desc1,desc2)
 
     # do proximity test
-    #match_offsets = _calculate_offsets_between_matches(kps1,kps2,match_candidates)
-    #proximity_in_pixels = _calculate_proximity_threshold(match_offsets)
-    #offsets_histogram = _make_offsets_histogram(match_offsets,proximity_in_pixels)
-    proximity_in_pixels = MATCH_PROXIMITY_IN_PIXELS
+    if DYNAMIC_PROXIMITY_TEST:
+        match_offsets = _calculate_offsets_between_matches(kps1,kps2,match_candidates)
+        proximity_in_pixels,fit_converged = _calculate_proximity_threshold(match_offsets)
+    else:
+        proximity_in_pixels = MATCH_PROXIMITY_IN_PIXELS
+        fit_converged = -1
+
     matches = [
         m for m in match_candidates if _are_close(kps1[m.queryIdx],kps2[m.trainIdx],proximity_in_pixels)
     ]
-    #matches = match_candidates
-    #kps1_matched = [kps1[m.queryIdx] for m in matches]
-    #kps2_matched = [kps2[m.trainIdx] for m in matches]
-    #kps1_unmatched = set(kps1) - set(kps1_matched)
-    #kps2_unmatched = set(kps2) - set(kps2_matched)
 
     # calculate average match rate 
     N_kps1 = len(kps1)
     N_kps2 = len(kps2)
     N_matches = len(matches)
-    #match_rate_1 = N_matches/float(N_kps1)           #  average match rate for im1
-    #match_rate_2 = N_matches/float(N_kps2)           #  average match rate for im2
     average_match_rate = 2*N_matches/float(N_kps1+N_kps2)
 
-    """
-    # REDO proximity test using KNN matching
-    match_candidates_k = BFMATCH.knnMatch(desc1,desc2,k=K_NEAREST)
-    print 'Found {0} match candidates with kNN...'.format(len(match_candidates_k))
-    matches_k = []
-    for knnlist in match_candidates_k:
-        for m in knnlist:
-            if _are_close(kps1[m.queryIdx],kps2[m.trainIdx],proximity_in_pixels):
-                matches_k.append(m)
-                break
-    print '...of which {0} are within the proximity limit of {1} pixels.'.format(len(matches_k),proximity_in_pixels)
-    kps1_matched = [kps1[m.queryIdx] for m in matches_k]
-    kps2_matched = [kps2[m.trainIdx] for m in matches_k]
-    """
-
     # print output
-    log_string = "{0}, {1}, {2}, {3}, {4}".format(im_filename,N_kps1,N_kps2,N_kps1+N_kps2,average_match_rate)
-    print log_string + ", " + str(proximity_in_pixels)
+    log_string = "{0}, {1}, {2}, {3}, {4}, {5}, {6}".format(im_filename,N_kps1,N_kps2,N_kps1+N_kps2,average_match_rate,proximity_in_pixels,fit_converged)
+    print log_string
     f_log.write(log_string+'\n')
 
 f_log.close()
+
+# display averages
+match_rates = np.genfromtxt(args.log_file, delimiter=',',usecols=4)
+print("Average match rate: {0}".format(np.mean(match_rates)))
+
 print("Finished")
