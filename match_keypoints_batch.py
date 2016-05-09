@@ -16,8 +16,8 @@ from scipy.stats import poisson
 
 # global parameters
 FEATURES = ("SIFT", "KAZE")[1]              # choose feature type
-DYNAMIC_PROXIMITY_TEST = False              # select fixed or dynamic proximity test
-DO_KNN_MATCH = True                        # use kNN matching (DYNAMIC_PROXIMITY_TEST must be False)
+DO_DYNAMIC_PROXIMITY_TEST = False           # select fixed or dynamic proximity test
+DO_KNN_MATCH = True                         # use kNN matching (DO_DYNAMIC_PROXIMITY_TEST must be False)
 KAZE_PARAMETER = 0.0003                     # empirical
 MATCH_PROXIMITY_IN_PIXELS = 4               # empirical
 K_NEAREST = 5                               # empirical
@@ -83,7 +83,7 @@ def do_non_knn_match(kps1,kps2,desc1,desc2,MATCHER):
     # Use either fixed or dynamic proximity test
 
     match_candidates = MATCHER.match(desc1,desc2)
-    if DYNAMIC_PROXIMITY_TEST:
+    if DO_DYNAMIC_PROXIMITY_TEST:
         match_offsets = _calculate_offsets_between_matches(kps1,kps2,match_candidates)
         proximity_in_pixels,fit_converged = _calculate_proximity_threshold(match_offsets)
     else:
@@ -101,24 +101,26 @@ def do_knn_match(kps1,kps2,desc1,desc2,MATCHER):
 
     match_candidates = MATCHER.knnMatch(desc1,desc2,k=K_NEAREST)
     matches_forward = []
-    rank_chosen_forward = []
+    n_not_first_match_forward = 0
     for knnlist in match_candidates:
         for n,m in enumerate(knnlist):
             if _are_close(kps1[m.queryIdx],kps2[m.trainIdx],MATCH_PROXIMITY_IN_PIXELS):
                 matches_forward.append(m)
-                rank_chosen_forward.append(n)
+                if n > 0:
+                    n_not_first_match_forward += 1
                 break
 
     n_forward = len(matches_forward)
 
     match_candidates = MATCHER.knnMatch(desc2,desc1,k=K_NEAREST)
     matches_backward = []
-    rank_chosen_backward = []
+    n_not_first_match_backward = 0
     for knnlist in match_candidates:
         for n,m in enumerate(knnlist):
             if _are_close(kps1[m.trainIdx],kps2[m.queryIdx],MATCH_PROXIMITY_IN_PIXELS):
                 matches_backward.append(m)
-                rank_chosen_backward.append(n)
+                if n > 0:
+                    n_not_first_match_backward += 1
                 break
 
     n_backward = len(matches_backward)
@@ -132,10 +134,7 @@ def do_knn_match(kps1,kps2,desc1,desc2,MATCHER):
                 matches_backward.remove(mb)    # unique matching only
                 break
 
-    #kps1_matched = [kps1[m.queryIdx] for m in matches_k]
-    #kps2_matched = [kps2[m.trainIdx] for m in matches_k]
-
-    return matches, n_forward, n_backward, np.mean(rank_chosen_forward), np.mean(rank_chosen_backward)
+    return matches, n_forward, n_backward, n_not_first_match_forward, n_not_first_match_backward
 
 
 # read args
@@ -146,7 +145,7 @@ args = parser.parse_args()
 
 # open log file
 f_log = open(args.log_file,'a')
-log_string = "Filename, N_kps1, N_kps2, N_kps1+N_kps2, average_match_rate, proximity_in_pixels, fit_converged, n_forward, n_backward, rank_forward, rank_backward"
+log_string = "Filename, N_kps1, N_kps2, average_match_rate, proximity_in_pixels, fit_converged, n_forward, n_backward, n_not_first_match_forward, n_not_first_match_backward"
 f_log.write(log_string+'\n')
 
 # instantiate global OpenCV objects
@@ -181,15 +180,15 @@ for im_filename in os.listdir(args.image_directory):
 
     # find matches
     if DO_KNN_MATCH:       # using k-nearest-neighbor matching
-        matches, n_forward, n_backward, rank_forward, rank_backward = do_knn_match(kps1,kps2,desc1,desc2,BFMATCH)
+        matches, n_forward, n_backward, n_not_first_match_forward, n_not_first_match_backward = do_knn_match(kps1,kps2,desc1,desc2,BFMATCH)
         proximity_in_pixels = MATCH_PROXIMITY_IN_PIXELS
         fit_converged = -1
     else:           # not using k-nearest-neighbor matching
         matches, proximity_in_pixels, fit_converged = do_non_knn_match(kps1,kps2,desc1,desc2,BFMATCH)
         n_forward = -1
         n_backward = -1
-        rank_forward = -1
-        rank_backward = -1
+        n_not_first_match_forward = -1
+        n_not_first_match_backward = -1
 
     # calculate average match rate 
     N_kps1 = len(kps1)
@@ -198,13 +197,35 @@ for im_filename in os.listdir(args.image_directory):
     average_match_rate = 2*N_matches/float(N_kps1+N_kps2)
 
     # print output
-    log_string = "{0}, {1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, {9}, {10}".format(im_filename,N_kps1,N_kps2,N_kps1+N_kps2,average_match_rate,proximity_in_pixels,fit_converged,n_forward,n_backward,rank_forward,rank_backward)
+    log_string = "{0}, {1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, {9}".format(im_filename,N_kps1,N_kps2,average_match_rate,proximity_in_pixels,fit_converged,n_forward,n_backward,n_not_first_match_forward,n_not_first_match_backward)
     print log_string
     f_log.write(log_string+'\n')
 
 f_log.close()
 
 # display averages
-match_rates = np.genfromtxt(args.log_file, delimiter=',',usecols=4,skip_header=1)
+match_rates = np.genfromtxt(args.log_file,delimiter=',',usecols=3,skip_header=1)
 print("Average match rate: {0}".format(np.mean(match_rates)))
+
+if DO_DYNAMIC_PROXIMITY_TEST:
+    fit_converged_vals = np.genfromtxt(args.log_file,delimiter=',',usecols=5,skip_header=1)
+    print("Fit converged rate: {0}".format(np.mean(fit_converged_vals)))
+    proximity_vals = np.genfromtxt(args.log_file,delimiter=',',usecols=4,skip_header=1)
+    print("Average proximity: {0} pixels".format(np.mean(proximity_vals)))
+
+if DO_KNN_MATCH:
+    N_kps1_vals = np.genfromtxt(args.log_file,delimiter=',',usecols=1,skip_header=1)
+    N_kps2_vals = np.genfromtxt(args.log_file,delimiter=',',usecols=2,skip_header=1)
+    N_matches_vals = 0.5 * np.multiply((N_kps1_vals + N_kps2_vals),match_rates)
+    N_forward_matches_vals = np.genfromtxt(args.log_file,delimiter=',',usecols=6,skip_header=1)
+    N_backward_matches_vals = np.genfromtxt(args.log_file,delimiter=',',usecols=7,skip_header=1)
+    crosscheck_vals = 2 * np.divide(N_matches_vals,(N_forward_matches_vals + N_backward_matches_vals))
+    print("Average cross-check rate in kNN match: {0}".format(np.mean(crosscheck_vals)))
+
+    N_not_first_match_forward_vals = np.genfromtxt(args.log_file,delimiter=',',usecols=8,skip_header=1)
+    N_not_first_match_backward_vals = np.genfromtxt(args.log_file,delimiter=',',usecols=9,skip_header=1)
+    fraction_not_first_forward = np.divide(N_not_first_match_forward_vals,N_forward_matches_vals)
+    fraction_not_first_backward = np.divide(N_not_first_match_backward_vals,N_backward_matches_vals)
+    print("Rate that not-first match was chosen: {0} (forward), {1} (backward)".format(np.mean(fraction_not_first_forward),np.mean(fraction_not_first_backward)))
+
 print("Finished")
