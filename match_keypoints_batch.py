@@ -145,7 +145,7 @@ args = parser.parse_args()
 
 # open log file
 f_log = open(args.log_file,'a')
-log_string = "Filename, N_kps1, N_kps2, average_match_rate, proximity_in_pixels, fit_converged, n_forward, n_backward, n_not_first_match_forward, n_not_first_match_backward"
+log_string = "Filename, N_kps1, N_kps2, N_kps_total, average_match_rate, proximity_in_pixels, fit_converged, n_forward, n_backward, n_not_first_match_forward, n_not_first_match_backward"
 f_log.write(log_string+'\n')
 
 # instantiate global OpenCV objects
@@ -197,33 +197,33 @@ for im_filename in os.listdir(args.image_directory):
     average_match_rate = 2*N_matches/float(N_kps1+N_kps2)
 
     # print output
-    log_string = "{0}, {1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, {9}".format(im_filename,N_kps1,N_kps2,average_match_rate,proximity_in_pixels,fit_converged,n_forward,n_backward,n_not_first_match_forward,n_not_first_match_backward)
+    log_string = "{0}, {1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, {9}, {10}".format(im_filename,N_kps1,N_kps2,N_kps1+N_kps2,average_match_rate,proximity_in_pixels,fit_converged,n_forward,n_backward,n_not_first_match_forward,n_not_first_match_backward)
     print log_string
     f_log.write(log_string+'\n')
 
 f_log.close()
 
 # display averages
-match_rates = np.genfromtxt(args.log_file,delimiter=',',usecols=3,skip_header=1)
+match_rates = np.genfromtxt(args.log_file,delimiter=',',usecols=4,skip_header=1)
 print("Average match rate: {0}".format(np.mean(match_rates)))
 
 if DO_DYNAMIC_PROXIMITY_TEST:
-    fit_converged_vals = np.genfromtxt(args.log_file,delimiter=',',usecols=5,skip_header=1)
+    fit_converged_vals = np.genfromtxt(args.log_file,delimiter=',',usecols=6,skip_header=1)
     print("Fit converged rate: {0}".format(np.mean(fit_converged_vals)))
-    proximity_vals = np.genfromtxt(args.log_file,delimiter=',',usecols=4,skip_header=1)
+    proximity_vals = np.genfromtxt(args.log_file,delimiter=',',usecols=5,skip_header=1)
     print("Average proximity: {0} pixels".format(np.mean(proximity_vals)))
 
 if DO_KNN_MATCH:
     N_kps1_vals = np.genfromtxt(args.log_file,delimiter=',',usecols=1,skip_header=1)
     N_kps2_vals = np.genfromtxt(args.log_file,delimiter=',',usecols=2,skip_header=1)
     N_matches_vals = 0.5 * np.multiply((N_kps1_vals + N_kps2_vals),match_rates)
-    N_forward_matches_vals = np.genfromtxt(args.log_file,delimiter=',',usecols=6,skip_header=1)
-    N_backward_matches_vals = np.genfromtxt(args.log_file,delimiter=',',usecols=7,skip_header=1)
+    N_forward_matches_vals = np.genfromtxt(args.log_file,delimiter=',',usecols=7,skip_header=1)
+    N_backward_matches_vals = np.genfromtxt(args.log_file,delimiter=',',usecols=8,skip_header=1)
     crosscheck_vals = 2 * np.divide(N_matches_vals,(N_forward_matches_vals + N_backward_matches_vals))
     print("Average cross-check rate in kNN match: {0}".format(np.mean(crosscheck_vals)))
 
-    N_not_first_match_forward_vals = np.genfromtxt(args.log_file,delimiter=',',usecols=8,skip_header=1)
-    N_not_first_match_backward_vals = np.genfromtxt(args.log_file,delimiter=',',usecols=9,skip_header=1)
+    N_not_first_match_forward_vals = np.genfromtxt(args.log_file,delimiter=',',usecols=9,skip_header=1)
+    N_not_first_match_backward_vals = np.genfromtxt(args.log_file,delimiter=',',usecols=10,skip_header=1)
     fraction_not_first_forward = np.divide(N_not_first_match_forward_vals,N_forward_matches_vals)
     fraction_not_first_backward = np.divide(N_not_first_match_backward_vals,N_backward_matches_vals)
     print("Rate that not-first match was chosen: {0} (forward), {1} (backward)".format(np.mean(fraction_not_first_forward),np.mean(fraction_not_first_backward)))
