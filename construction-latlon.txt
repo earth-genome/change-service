@@ -27,3 +27,15 @@
 -117.227, 32.878, -117.214, 32.858, # Demolition at UC San Diego
 -121.847, 37.700, -121.817, 37.700 # New mall in Livermore
 -117.157, 32.970, -117.130, 32.970 # New housing development in San Diego
+-117.484, 33.890, -117.460, 33.890 # New high school (Hillcrest) in Riverside
+-122.047, 37.335, -122.022, 37.335 # New stadium in Los Altos
+-118.215, 33.834, -118.185, 33.834 # New school in Long Beach
+-118.422, 34.289, -118.445, 34.284 # New school in Los Angeles
+-116.240, 33.605, -116.250, 33.630 # Subdivision, evaporation ponds, La Quinta
+-116.435, 33.817, -116.450, 33.817 # New community college (?), Rancho Mirage
+-122.367, 40.598, -122.390, 40.598 # Subdivision, Redding
+-121.091, 38.659, -121.071, 38.646 # Subdivision, Folsom
+-121.217, 38.805, -121.217, 38.785 # Land cleared, Rocklin
+-117.264, 33.116, -117.238, 33.116 # Subdivision, Carlsbad
+-121.500, 38.583, -121.505, 38.563 # Road construction, Sacramento railyards
+-122.028, 37.410, -122.028, 37.390 # Office park redevelopment, Sunnyvale

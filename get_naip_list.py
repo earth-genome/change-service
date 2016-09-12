@@ -39,30 +39,35 @@ def image_pull(fileprefix,latlon):
     savedir = fileprefix
     if not os.path.exists(savedir):
         os.makedirs(savedir)
-    f_log = open(os.path.join(savedir,fileprefix+'.log'),'w')
+    f_log = open(os.path.join(savedir,fileprefix+'.log'),'a')
 
     payload = {}
     payload['color'] = COLOR
     payload['dimension'] = DIMENSION
     
     # build payload and make call for imagery
+    ct = 0
     for (mylat,mylon) in latlon:
         payload['lon'] = mylon
         payload['lat'] = mylat
         for y in YEARS:
-            payload['year'] = y	
-            url_payload = urllib.urlencode(payload)
-            full_url = API_BASE_IMAGERY + '?' + url_payload
-            response = urllib2.urlopen(full_url)
-            image = response.read()
             filename = (str(mylat)+str(mylon)+
                         '-dim'+str(DIMENSION)+
                         '-'+str(y)+'.png')
             save_path = os.path.join(savedir,filename)
-            with open(save_path,'wb') as f:
-                f.write(image)
-            f_log.write("{0}, {1}\n".format(save_path,full_url))
-            print 'Saved: {0} from URL: {1}'.format(save_path,full_url)
+            if not os.path.exists(save_path):
+                payload['year'] = y	
+                url_payload = urllib.urlencode(payload)
+                full_url = API_BASE_IMAGERY + '?' + url_payload
+                response = urllib2.urlopen(full_url)
+                image = response.read()
+
+                with open(save_path,'wb') as f:
+                    f.write(image)
+                f_log.write("{0}, {1}\n".format(save_path,full_url))
+                print 'Saved: {0} from URL: {1}'.format(save_path,full_url)
+                ct += 1
+    print "Downloaded {} new image files.".format(ct)
     f_log.close()
 
 if __name__ == '__main__':
