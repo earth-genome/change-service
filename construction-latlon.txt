@@ -1,33 +1,33 @@
 # Lat/Lon for change tile, followed by Lat/Lon for nearby null
 -119.691, 36.735, -119.733, 36.762 # Fresno filling in the subdivision
--121.967, 38.021, -121.942, 38.021  # Bay Point housing development
+-121.973, 38.017, -121.942, 38.011  # Bay Point housing development
 -118.149, 33.827, -118.140, 33.800 # New arehouse at Long Beach Airport
 -118.277, 33.771, -118.200, 33.775 # Wilmington waterfront park construction
--117.927, 33.999, -117.903, 34.009 # City of Industry building demolition
+-117.927, 33.994, -117.903, 34.009 # City of Industry building demolition
 -121.970, 37.403, -121.990, 37.38 # Levi's stadium initial construction
 -118.228, 34.701, -118.228, 34.679 # New PV array, Lancaster
 -117.290, 34.425, -117.270, 34.438 # New development, Hesperia
 -117.354, 34.465, -117.330, 34.47 # New Walmart, Hesperia
--120.685, 35.252, -120.685, 35.287 # New Target, SLO
+-120.693, 35.252, -120.685, 35.287 # New Target, SLO
 -120.660, 35.252, -120.634, 35.252 # Grading for new housing development, SLO
 -117.607, 33.464, -117.607, 33.483 # New Target, San Clemente
--119.696, 36.840, -119.751, 36.840 # Initial construction on new Walmart, Fresno
+-119.700, 36.840, -119.751, 36.840 # Initial construction on new Walmart, Fresno
 -117.169, 33.615, -117.140, 33.615 # New hospital in Murrieta
 -117.106, 33.481, -117.106, 33.515 # New hospital in Torrance
 -117.298, 34.139, -117.370, 34.110 # Housing block demolished, San Bernadino
 -117.602, 34.115, -117.602, 34.135 # New track, San Bernadino
 -117.575, 34.115, -117.575, 34.135 # New housing development, San Bernadino
--117.333, 34.023, -117.303, 34.028 # New sports complex in Riverside
+-117.3355, 34.026, -117.303, 34.028 # New sports complex in Riverside
 -117.440, 34.549, -117.440, 34.570 # New PV array in Adelanto
 -117.623, 33.527, -117.623, 33.546 # Large land clearning in Orange County
 -121.983, 38.329, -122.008, 38.354 # New jail facilities in Vacaville
--117.124, 33.135, -117.100, 33.135 # New Costco in San Marco
--117.638, 33.952, -117.668, 33.927 # Chino prison construction, PV construction
--121.263, 38.098, -121.285, 38.108 # New Home Depot in Lodi
--117.227, 32.878, -117.214, 32.858, # Demolition at UC San Diego
--121.847, 37.700, -121.817, 37.700 # New mall in Livermore
+-117.124, 33.135, -117.095, 33.155 # New Costco in San Marco
+-117.638, 33.947, -117.668, 33.927 # Chino prison construction, PV construction
+-121.264, 38.098, -121.2875, 38.110 # New Home Depot in Lodi
+-117.220, 32.874, -117.214, 32.854, # Demolition at UC San Diego
+-121.860, 37.700, -121.817, 37.700 # New mall in Livermore
 -117.157, 32.970, -117.130, 32.970 # New housing development in San Diego
--117.484, 33.890, -117.460, 33.890 # New high school (Hillcrest) in Riverside
+-117.484, 33.890, -117.460, 33.885 # New high school (Hillcrest) in Riverside
 -122.047, 37.335, -122.022, 37.335 # New stadium in Los Altos
 -118.215, 33.834, -118.185, 33.834 # New school in Long Beach
 -118.422, 34.289, -118.445, 34.284 # New school in Los Angeles
@@ -36,6 +36,5 @@
 -122.367, 40.598, -122.390, 40.598 # Subdivision, Redding
 -121.091, 38.659, -121.071, 38.646 # Subdivision, Folsom
 -121.217, 38.805, -121.217, 38.785 # Land cleared, Rocklin
--117.264, 33.116, -117.238, 33.116 # Subdivision, Carlsbad
--121.500, 38.583, -121.505, 38.563 # Road construction, Sacramento railyards
+-121.498, 38.579, -121.505, 38.559 # Road construction, Sacramento railyards
 -122.028, 37.410, -122.028, 37.390 # Office park redevelopment, Sunnyvale

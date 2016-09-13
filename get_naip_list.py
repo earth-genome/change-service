@@ -35,17 +35,20 @@ def read_latlon(infile):
 def image_pull(fileprefix,latlon):
     """Pull images from coordinate list latlon and write to file."""
 
-    # make save, log directories
+    # create save directory, logfile
     savedir = fileprefix
     if not os.path.exists(savedir):
         os.makedirs(savedir)
     f_log = open(os.path.join(savedir,fileprefix+'.log'),'a')
+    
 
     payload = {}
     payload['color'] = COLOR
     payload['dimension'] = DIMENSION
     
     # build payload and make call for imagery
+    images_to_clean = os.listdir(savedir)
+    images_to_clean.remove(fileprefix+'.log')
     ct = 0
     for (mylat,mylon) in latlon:
         payload['lon'] = mylon
@@ -67,8 +70,15 @@ def image_pull(fileprefix,latlon):
                 f_log.write("{0}, {1}\n".format(save_path,full_url))
                 print 'Saved: {0} from URL: {1}'.format(save_path,full_url)
                 ct += 1
+            else:
+                images_to_clean.remove(filename)
     print "Downloaded {} new image files.".format(ct)
+    print "Removing {} old image files.".format(len(images_to_clean))
+    for img_file in images_to_clean:
+        os.remove(os.path.join(savedir,img_file))
+        print 'Removed {}'.format(img_file)
     f_log.close()
+      
 
 if __name__ == '__main__':
     try:
