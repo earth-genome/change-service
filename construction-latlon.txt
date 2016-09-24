@@ -1,7 +1,7 @@
 # Lat/Lon for change tile, followed by Lat/Lon for nearby null
 -119.691, 36.735, -119.733, 36.762 # Fresno filling in the subdivision
 -121.973, 38.017, -121.942, 38.011  # Bay Point housing development
--118.149, 33.827, -118.140, 33.800 # New arehouse at Long Beach Airport
+-118.149, 33.827, -118.140, 33.800 # New warehouse at Long Beach Airport
 -118.277, 33.771, -118.200, 33.775 # Wilmington waterfront park construction
 -117.927, 33.994, -117.903, 34.009 # City of Industry building demolition
 -121.970, 37.403, -121.990, 37.38 # Levi's stadium initial construction
@@ -19,9 +19,9 @@
 -117.575, 34.115, -117.575, 34.135 # New housing development, San Bernadino
 -117.3355, 34.026, -117.303, 34.028 # New sports complex in Riverside
 -117.440, 34.549, -117.440, 34.570 # New PV array in Adelanto
--117.623, 33.527, -117.623, 33.546 # Large land clearning in Orange County
+-117.745, 33.648, -117.735, 33.623 # Demolition of Wild Rivers, Irvine
 -121.983, 38.329, -122.008, 38.354 # New jail facilities in Vacaville
--117.124, 33.135, -117.095, 33.155 # New Costco in San Marco
+-117.124, 33.135, -117.095, 33.155 # New Costco in San Marcos
 -117.638, 33.947, -117.668, 33.927 # Chino prison construction, PV construction
 -121.264, 38.098, -121.2875, 38.110 # New Home Depot in Lodi
 -117.220, 32.874, -117.214, 32.854, # Demolition at UC San Diego
@@ -38,3 +38,14 @@
 -121.217, 38.805, -121.217, 38.785 # Land cleared, Rocklin
 -121.498, 38.579, -121.505, 38.559 # Road construction, Sacramento railyards
 -122.028, 37.410, -122.028, 37.390 # Office park redevelopment, Sunnyvale
+-118.233, 34.109, -118.233, 34.132 # New sports field, Los Angeles
+-117.255, 34.115, -117.230, 34.115 # New school, San Bernadino
+-117.102, 33.100, -117.077, 33.100 # Site clearing, Escondido
+-117.147, 33.937, -117.145, 33.917 # New warehouse in Moreno
+-117.290, 33.110, -117.242, 33.106 # Subdivision, Carlsbad
+-119.105, 35.315, -119.085, 35.348 # Subdivision, Bakersfield
+-119.062, 35.340, -119.0515, 35.360 # Golden Corral, Bakersfield
+-119.129, 35.402, -119.080, 35.407 # Playingfields, Bakersfield
+-119.312, 36.364, -119.262, 36.339 # Subdivision, sports club, Visalia
+-119.869, 36.8023, -119.894, 36.822 # Repurposed industrial yards, Fresno
+-119.664, 36.836, -119.684, 36.856 # Medical center, Clovis
