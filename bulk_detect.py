@@ -35,6 +35,9 @@ import numpy as np
 import cv2
 import scipy.stats
 import scipy.signal
+from scipy.optimize import curve_fit
+from scipy.misc import factorial
+from scipy.stats import poisson
 import pdb
 
 import bulk_wrapper
@@ -83,8 +86,11 @@ def _make_offsets_histogram(offsets,cutoff,im_size):
     max_offset = int(0.25 * im_size)    
     x_scale_factor = x_size / max_offset
     y_size = 64.0   # display convenience only
-    max_val = int(1.5 * np.amax(offsets)) 
-    y_scale_factor = y_size / max_val
+    try:
+        max_val = int(1.5 * np.amax(offsets))
+        y_scale_factor = y_size / max_val
+    except ZeroDivisionError:
+        y_scale_factor = y_size
     plot_box = 255 * np.ones((y_size,x_size,3),np.uint8)
     for n,val in enumerate(offsets):
         xpos = int(x_scale_factor * n)
@@ -108,7 +114,10 @@ def _plot_local_keypoint_histogram(kp_histogram_forward,kp_histogram_backward,im
     x_scale_factor = x_size / max_kps
     y_size = 64.0               # for convenience of display
     max_val = int(1.5 * np.amax(np.concatenate((kp_histogram_forward,kp_histogram_backward),axis=0)))
-    y_scale_factor = y_size / max_val
+    try: 
+        y_scale_factor = y_size / max_val
+    except ZeroDivisionError:
+        y_scale_factor = y_size
     plot_box = 255 * np.ones((y_size,x_size,3),np.uint8)
     for n,val in enumerate(kp_histogram_forward):
         xpos = int(x_scale_factor * n)
@@ -126,28 +135,25 @@ def _plot_local_keypoint_histogram(kp_histogram_forward,kp_histogram_backward,im
     plot_box[:,-1,:] = (0,0,0)      # edge divider
     return plot_box
 
-def _calculate_proximity_threshold(offsets,num_sigma=2):
-    # Calculates the optimum proximity threshold
-    # Starts by fitting histogram of match offsets to a gaussian
-    # The threshold is the center of the gaussian fit, plus num_sigma * sigma
-    # Note this means we don't cut off matches that are at short distances; small effect
-    # If fit fails, return 1.5 * REGISTRATION_OFFSET
+def _poisson(x,a,y0,mu):
+    # Defines a poisson distribution for curve fitting
+    return y0 + a * poisson.pmf(x,mu)
 
-    xdat = np.arange(len(offsets))
-    a_guess = np.amax(offsets)
-    x0_guess = np.argmax(offsets)       
-    sigma_guess = MATCH_PROXIMITY_IN_PIXELS / 2                     # empirical
-    try:
-        popt,pcov = curve_fit(_gaussian,xdat,offsets,[a_guess,x0_guess,sigma_guess])
-    except OptimizeWarning:
-        print "Gaussian fit of registration error failed"
-        return MATCH_PROXIMITY_IN_PIXELS    # default
+def _calculate_proximity_threshold(offsets,MATCH_PROXIMITY_IN_PIXELS):
+    # Returns the optimum proximity threshold
 
-    if popt[1] >= 0:
-        return int(popt[1] + num_sigma * popt[2])
+    xvals = np.arange(len(offsets))
+    mu_guess = np.argmax(offsets)
+    a_guess = offsets[mu_guess]
+    y0_guess = offsets[-1]
+    popt,pcov = curve_fit(_poisson,xvals,offsets,[a_guess,mu_guess,y0_guess])
+    if popt[1] > 0:
+        max_distance = int(poisson.interval(0.99,popt[1])[-1])
+        fit_converged = 1
     else:
-        print "Gaussian fit of registration error failed"
-        return MATCH_PROXIMITY_IN_PIXELS
+        max_distance = MATCH_PROXIMITY_IN_PIXELS
+        fit_converged = 0
+    return max_distance, fit_converged
 
 
 def _are_close(kpa,kpb,distance):
@@ -210,6 +216,9 @@ def detect_change(im1_file, im2_file, RelDir, output_dir,**kwparams):
     MATCH_NEIGHBORHOOD_IN_PIXELS = kwparams['MATCH_NEIGHBORHOOD_IN_PIXELS']
     MATCH_PROBABILITY_THRESHOLD = kwparams['MATCH_PROBABILITY_THRESHOLD']
     STATS_TEST = kwparams['STATS_TEST']
+    #CROSS_CHECK = kwparams['CROSS_CHECK']
+    TRUE_CROSS_CHECK = kwparams['TRUE_CROSS_CHECK']
+    #LONGER_MATCHLIST = kwparams['LONGER_MATCHLIST']
 
     # load image files [note grayscale: 0; color: 1]
     im1_file_relpath = os.path.join(RelDir, im1_file)
@@ -255,13 +264,16 @@ def detect_change(im1_file, im2_file, RelDir, output_dir,**kwparams):
     offsets = _calculate_offsets_between_matches(kps1,kps2,
                                             top_match_candidates,IMAGE_WIDTH)
     if CALCULATE_PROXIMITY_LIMIT == True:
-        proximity_limit = _calculate_proximity_threshold(offsets)
+        proximity_limit = _calculate_proximity_threshold(offsets,
+                                MATCH_PROXIMITY_IN_PIXELS)[0]
     else:
         proximity_limit = MATCH_PROXIMITY_IN_PIXELS
 # 
     matches = []
+    matches_forward = []
+    matches_backward = []
 
-    if HOMOGRAPHY == True:
+    if HOMOGRAPHY:
         H, mask = _calculate_homography(top_match_candidates,kps1,kps2)
         print 'Estimated homography transformation:'
         print H
@@ -269,20 +281,97 @@ def detect_change(im1_file, im2_file, RelDir, output_dir,**kwparams):
             for m in knnlist:
                 if _check_homography(kps1[m.queryIdx].pt,kps2[m.trainIdx].pt,
                                      H,radius=proximity_limit):
-                    matches.append(m)
+                    matches_forward.append(m)
                     break
+        if len(matches_forward) == 0:
+            return [], (len(kps1)+len(kps2))/2.
     else:
         for knnlist in match_candidates:
             for m in knnlist:
                 if _are_close(kps1[m.queryIdx],kps2[m.trainIdx],
                       proximity_limit):
-                    matches.append(m)
+                    matches_forward.append(m)
                     break
+
+    # N.B. currently CROSS_CHECK is not set up to work with HOMOGRAPHY
+    """
+    if CROSS_CHECK:
+        match_candidates_backwards = BFMATCH.knnMatch(desc2,desc1,k=KNEAREST)
+        for knnlist in match_candidates_backwards:
+            for m in knnlist:
+                if _are_close(kps1[m.trainIdx],kps2[m.queryIdx],
+                      proximity_limit):
+                    matches_backward.append(m)
+                    break
+        if len(matches_forward) > len(matches_backward):
+            for mf in matches_forward:
+                for mb in matches_backward:
+                    if mf.trainIdx == mb.queryIdx:
+                        matches.append(mf)
+                        #matches_backward.remove(mb)    # unique matching only
+                        break
+        else:
+            for mb in matches_backward:
+                for mf in matches_forward:
+                    if mb.trainIdx == mf.queryIdx:
+                        matches.append(mb)
+                        break
+    elif LONGER_MATCHLIST:
+        match_candidates_backwards = BFMATCH.knnMatch(desc2,desc1,k=KNEAREST)
+        for knnlist in match_candidates_backwards:
+            for m in knnlist:
+                if _are_close(kps1[m.trainIdx],kps2[m.queryIdx],
+                      proximity_limit):
+                    matches_backward.append(m)
+                    break
+        if len(matches_forward) > len(matches_backward):
+            matches = list(matches_forward)
+        else:
+            matches = list(matches_backward)
+    """        
+    if TRUE_CROSS_CHECK:
+        match_candidates_backwards = BFMATCH.knnMatch(desc2,desc1,k=KNEAREST)
+        for knnlist in match_candidates_backwards:
+            for m in knnlist:
+                if _are_close(kps1[m.trainIdx],kps2[m.queryIdx],
+                      proximity_limit):
+                    matches_backward.append(m)
+                    break
+        for mf in matches_forward:
+            for mb in matches_backward:
+                if mf.trainIdx == mb.queryIdx and mf.queryIdx == mb.trainIdx:
+                    matches.append(mf)
+                    matches_backward.remove(mb)   
+                    break
+        """
+        with open('kNNtruematch.log','a') as f:
+            f.write(save_image_filename+':\n')
+            f.write('lenkps1, lenkps2: {}, {}\n'.format(
+                len(kps1),len(kps2)))
+            f.write('lenmf, lenmb, lenmatches: {}, {}, {}\n'.format(
+                len(matches_forward),len(matches_backward),len(matches)))
+            try:
+                rat = len(matches)/float(min(
+                    len(matches_forward),len(matches_backward)))
+            except ZeroDivisionError:
+                rat = None
+            f.write('matches/min(mf,mb): {}\n'.format(rat))
+        return rat, None
+        """
+    else:
+        matches = list(matches_forward)
                 
     print '...of which {0} are within the proximity limit of {1} pixels.'.format(len(matches),proximity_limit)
+    """
+    if len(matches_forward) > len(matches_backward):
+        kps1_matched = [kps1[m.queryIdx] for m in matches]
+        kps2_matched = [kps2[m.trainIdx] for m in matches]
+    else:
+        kps1_matched = [kps1[m.trainIdx] for m in matches]
+        kps2_matched = [kps2[m.queryIdx] for m in matches]
+    """
     kps1_matched = [kps1[m.queryIdx] for m in matches]
     kps2_matched = [kps2[m.trainIdx] for m in matches]
-
     # calculate average match rate for each image
     N_kps1 = len(kps1)
     N_kps2 = len(kps2)
@@ -412,6 +501,7 @@ def detect_change(im1_file, im2_file, RelDir, output_dir,**kwparams):
     return kps1_changed + kps2_changed, (len(kps1)+len(kps2))/2.
 
 if __name__ == '__main__':
+    """Needs updating: See syntax in bulk_wrapper.py"""
     """Ex: python bulk_detect.py 'dim1000test/CCclearcutsdim1000-2010.jpg'
        'dim1000test/CCclearcutsdim1000-2012.jpg'
     """

@@ -40,17 +40,17 @@ def validate(change_img,labeled_img):
      intersect any labeled regions).
     """
 
-    # WIP: Currently a true positive is given if any labeled change region
-    # intersects with any detection region in the change mask.  This could
-    # be improved to check multiple regions independently.
-
-    WHITE = 255
+    PIXEL_MAX = 255
+    PIXEL_MIN = 0
+    PINK = [PIXEL_MAX,PIXEL_MIN,PIXEL_MAX]
     
     # convert images to binary
-    change_bin = change_img/WHITE
+    change_bin = change_img/PIXEL_MAX
     label_bin = np.zeros(labeled_img.shape[:2])
-    label_bin[np.where(np.all(labeled_img==[255,255,255],axis=2))] = 1
 
+    label_points = np.where(np.all(labeled_img==PINK,axis=2))
+    label_bin[label_points] = 1
+    
     label_max = np.max(label_bin)
     change_max = np.max(change_bin)
     if label_max == 0:
@@ -83,7 +83,8 @@ def tabulate(change_dir,labeled_dir):
         
     pairs = []
     for f1, f2 in itertools.izip(change_files,label_files):
-        if f1.split('-')[0] == f2.split('-')[0]:
+        if (f1.split(bulk_wrapper.SPLIT_STRING)[0] ==
+            f2.split(bulk_wrapper.SPLIT_STRING)[0]):
             pairs.append([f1,f2])
         else:
             sys.exit('Warning: {} or {} is missing a pair.'.format(f1,f2))
@@ -117,7 +118,8 @@ def tabulate(change_dir,labeled_dir):
     print('Total accuracy: {:.4f}, Correct positive rate: {}, Correct negative rate: {}\n'.format(totalaccuracy,posrate,negrate))
 
     try:
-        tpfpratio = totals['true positive']/float(totals['false positive'])
+        tpfpratio = totals['true positive']/float(
+            totals['false positive']+totals['erroneous detection'])
     except ZeroDivisionError:
         tpfpratio = None
     logfile.write('Ratio of true to false positives: {}\n--- ---\n\n'.format(tpfpratio))
