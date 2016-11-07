@@ -6,7 +6,8 @@
 # pos: True positive rate (percent)
 # neg: True negative rate (percent)
 # tpprop: True positives divided by total detections
-# fd: Number of false detections (currently unused)
+# fd: Number of false detections 
+# tp: Number of true positives
 # (total detections = true positives + false detections)
 
 import numpy as np
@@ -22,7 +23,8 @@ KAZEkNN5 = dict(
     pos = np.array(zip(logthresh,100*np.array(
      [.94,.92,.9,.82,.74,.6,.56,.44,.28,.24,.18,.14,.12,.1,.06,.04,.02]))),
     neg = np.array(zip(logthresh,100*np.array(
-     [.04,.12,.38,.52,.62,.68,.78,.84,.92,.96,.96,.98,1.0,1.0,1.0,1.0,1.]))),
+     [.04,.12,.38,.52,.62,.68,.78,.84,.92,.96,.96,.98,1.0,1.0,1.0,
+      1.0,1.]))),
     tpprop = np.array(zip(logthresh,np.array(
      [47/96.,46/92.,45/79.,41/68.,37/61.,30/53.,28/45.,22/35.,14/23.,12/16.,
       9/13.,7/8.,6/6.,5/6.,3/4.,2/3.,1/2.]))),
@@ -68,8 +70,8 @@ SIFTkNN5 = dict(
      [0.0,.36,.84,.98,.98,1.0,]))),
     tpprop = np.array(zip(logthresh,np.array(
      [48/99.,37/74.,21/33.,6/9.,1/2.,None]))),
-    #fd = np.array(zip(logthresh,
-    #        np.array([51.,37.,12.,3.,1.,0.])))
+    fd = np.array(zip(logthresh,
+            np.array([51.,37.,12.,3.,1.,0.])))
     )
 SIFTkNN5['tp'] = np.array(zip(logthresh,SIFTkNN5['pos'][:,1]*.50))
 SIFTkNN5['thresh'] = logthresh
