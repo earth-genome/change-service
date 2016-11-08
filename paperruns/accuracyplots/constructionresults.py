@@ -59,37 +59,38 @@ KAZEkNN1['tp'] = np.array(zip(logthresh,KAZEkNN1['pos'][:,1]*.50))
 KAZEkNN1['thresh'] = logthresh
 
 # SIFT-kNN5-nbhd30-thr1e-XX-ctfrac0.01ctnbhd120
-thresholds = [1e-01,1e-02,1e-03,1e-04,1e-05,1e-06,1e-07,1e-08]
+thresholds = [1e-01,3e-02,1e-02,3e-03,1e-03,3e-04,1e-04,3e-05,1e-05,
+              3e-06,1e-06]
 logthresh = [np.log10(x) for x in thresholds]
 SIFTkNN5 = dict(
     tot = np.array(zip(logthresh,100*np.array(
-     [.480,.550,.630,.550,.500,.500]))),
+     [.480,.460,.550,.580,.630,.540,.550,.510,.500,.510,.500]))),
     pos = np.array(zip(logthresh,100*np.array(
-     [.96,.74,.42,.12,.02,0.0,]))),
+     [.96,.86,.74,.48,.42,.16,.12,.04,.02,.02,0.0]))),
     neg = np.array(zip(logthresh,100*np.array(
-     [0.0,.36,.84,.98,.98,1.0,]))),
+     [0.0,.06,.36,.68,.84,.92,.98,.98,.98,1.0,1.0]))),
     tpprop = np.array(zip(logthresh,np.array(
-     [48/99.,37/74.,21/33.,6/9.,1/2.,None]))),
+     [48/99.,43/94.,37/74.,24/45.,21/33.,8/16.,6/9.,2/4.,1/3.,1/2.,None]))),
     fd = np.array(zip(logthresh,
-            np.array([51.,37.,12.,3.,1.,0.])))
+            np.array([51.,51.,37.,21.,12.,8.,3.,2.,2.,1.,0.])))
     )
 SIFTkNN5['tp'] = np.array(zip(logthresh,SIFTkNN5['pos'][:,1]*.50))
 SIFTkNN5['thresh'] = logthresh
 
 # SIFT-kNN1-nbhd30-thr1e-XX-ctfrac0.01ctnbhd120
-thresholds = [3e-01,1e-01,3e-02,1e-02,3e-03,1e-03,3e-04,1e-04,1e-05]
+thresholds = [3e-01,1e-01,3e-02,1e-02,3e-03,1e-03,3e-04,1e-04,3e-05,1e-05]
 logthresh = [np.log10(x) for x in thresholds]
 SIFTkNN1 = dict(
     tot = np.array(zip(logthresh,100*np.array(
-     [.490,.480,.490,.510,.560,.520,.490,.500,.500]))),
+     [.490,.480,.490,.510,.560,.520,.490,.500,.490,.500]))),
     pos = np.array(zip(logthresh,100*np.array(
-     [.98,.94,.86,.66,.4,.18,.08,.02,0.0]))),
+     [.98,.94,.86,.66,.4,.18,.08,.02,0.0,0.0]))),
     neg = np.array(zip(logthresh,100*np.array(
-     [0.0,.02,.12,.36,.72,.86,.9,.98,1.0]))),
+     [0.0,.02,.12,.36,.72,.86,.9,.98,.98,1.0]))),
     tpprop = np.array(zip(logthresh,np.array(
-     [49/99.,47/96.,43/88.,33/69.,20/41.,9/20.,4/13.,1/2.,0.]))),
+     [49/99.,47/96.,43/88.,33/69.,20/41.,9/20.,4/13.,1/3.,0/2.,0/1.]))),
     fd = np.array(zip(logthresh,
-            np.array([50.,49.,45.,36.,21.,11.,9.,1.,1.])))
+            np.array([50.,49.,45.,36.,21.,11.,9.,2.,2.,1.])))
     #tpfp = np.array(zip(logthresh,1-1/np.array(
     # [.98,.959,0,.917,.952,.818,.444,.5,0.0])))
     )
