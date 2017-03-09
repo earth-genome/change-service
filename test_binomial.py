@@ -16,14 +16,14 @@ import matplotlib.pyplot as plt
 NUMBER_OF_PATCHES_WIDE = 20
 NUMBER_OF_PATCHES_HIGH = 16
 KAZE_PARAMETER = 0.0003                 	# empirical
-keypoint_color = (255,0,0)
+keypoint_color = (127,0,0)
 black_color = (0,0,0)
 
 def _count_keypoints_in_each_neighborhood(kps,im):
     # count keypoints in each patch defined by NUMBER_OF_PATCHES_{WIDE/HIGH}
     kp_count = np.zeros([NUMBER_OF_PATCHES_WIDE,NUMBER_OF_PATCHES_HIGH])
     for kp in kps:
-        kp_count[kp.pt[1]/PATCH_WIDTH,kp.pt[0]/PATCH_HEIGHT] += 1
+        kp_count[int(kp.pt[1]/PATCH_WIDTH),int(kp.pt[0]/PATCH_HEIGHT)] += 1
 
     return kp_count.flatten()
 
@@ -80,9 +80,10 @@ args = parser.parse_args()
 # instantiate KAZE object
 KAZE = cv2.KAZE_create(threshold = KAZE_PARAMETER)
 
-# try to load image file [note grayscale: 0; color: 1]
+# try to load image file [note grayscale: 0; color: 1; with alpha channel: cv2.IMREAD_UNCHANGED]
 im_raw = cv2.imread(args.image_file,0)
 im_color = cv2.imread(args.image_file,1)
+im_unchanged = cv2.imread(args.image_file,cv2.IMREAD_UNCHANGED)
 IMAGE_WIDTH, IMAGE_HEIGHT = im_raw.shape[0], im_raw.shape[1]
 print("Image width: {0}; image height: {1}".format(IMAGE_WIDTH,IMAGE_HEIGHT))
 PATCH_WIDTH = IMAGE_WIDTH / NUMBER_OF_PATCHES_WIDE
@@ -131,14 +132,19 @@ ax1.set_ylabel("Cumulative fraction of patches")
 fig.savefig(args.save_file, bbox_inches='tight')
 
 # display    
-plt.show()
+#plt.show()
 
+# save image with keypoints and gridlines
+cv2.imwrite(args.save_image_file,_prepare_image(im_unchanged,kps))
+
+"""
 # add image with keypoints
 fig2 = plt.figure()
 ax2 = fig2.add_subplot(1,1,1)
 im_drawn = _prepare_image(im_color,kps)
-ax2.imshow(im_drawn)
+ax2.imshow(im_drawn,alpha=0.8)
 ax2.xaxis.set_visible(False)
 ax2.yaxis.set_visible(False)
-fig2.savefig(args.save_image_file, bbox_inches='tight')
+fig2.savefig(args.save_image_file, bbox_inches='tight', transparent=True, facecolor = fig.get_facecolor())
 plt.show()
+"""

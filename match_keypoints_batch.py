@@ -194,7 +194,9 @@ for im_filename in os.listdir(args.image_directory):
     N_kps1 = len(kps1)
     N_kps2 = len(kps2)
     N_matches = len(matches)
-    average_match_rate = 2*N_matches/float(N_kps1+N_kps2)
+    #debug
+    average_match_rate = 2*N_matches/float(N_kps1+N_kps2)       # this is the definition we use in the paper
+    #average_match_rate = 0.5 * (N_matches/float(N_kps1) + N_matches/float(N_kps2))
 
     # print output
     log_string = "{0}, {1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, {9}, {10}".format(im_filename,N_kps1,N_kps2,N_kps1+N_kps2,average_match_rate,proximity_in_pixels,fit_converged,n_forward,n_backward,n_not_first_match_forward,n_not_first_match_backward)
