@@ -36,67 +36,83 @@ def do_keypoint_detection(im1,im2,feature_detector):
 
     return kps1,kps2,desc1,desc2
 
-def do_non_knn_match(kps1,kps2,desc1,desc2):
-    # Do matching with standard BFMatch.match() and built-in cross-check
+def do_non_knn_match(kps1,kps2,desc1,desc2,crosscheck,proximity):
+    # Do matching with BFMatch.match(); with or without crosscheck, with or without proximity test
 
-    match_candidates = BFMATCH_CC.match(desc1,desc2)
-    """
-    matches = [
-        m for m in match_candidates if _are_close(kps1[m.queryIdx],kps2[m.trainIdx],MATCH_PROXIMITY_IN_PIXELS)
-    ]
-    """
-    matches = match_candidates
+    if crosscheck:
+        match_candidates = BFMATCH_CC.match(desc1,desc2)
+    else:
+        match_candidates = BFMATCH.match(desc1,desc2)
+
+    if proximity:
+        matches = [
+            m for m in match_candidates if _are_close(kps1[m.queryIdx],kps2[m.trainIdx],MATCH_PROXIMITY_IN_PIXELS)
+        ]
+    else:
+        matches = match_candidates
 
     return matches
 
-def do_knn_match(kps1,kps2,desc1,desc2):
-    # Do matching with kNN search
+def do_knn_match(kps1,kps2,desc1,desc2,crosscheck,proximity):
+    # Do matching with BFMatch.kNNmatch(); with or without crosscheck, with or without proximity test
 
-    match_candidates = BFMATCH.knnMatch(desc1,desc2,k=K_NEAREST)
+    match_candidates_forward = BFMATCH.knnMatch(desc1,desc2,k=K_NEAREST)
     matches_forward = []
-    #n_not_first_match_forward = 0
-    for knnlist in match_candidates:
-        matches_forward.append(knnlist[0])      # ignore proximity test for now
-    """
-        for n,m in enumerate(knnlist):
-            if _are_close(kps1[m.queryIdx],kps2[m.trainIdx],MATCH_PROXIMITY_IN_PIXELS):
-                matches_forward.append(m)
-                if n > 0:
-                    n_not_first_match_forward += 1
-                break   # only pick first match that passes proximity test (closest in descriptor space)
 
-    n_forward = len(matches_forward)
-    """
+    if not crosscheck:
 
-    match_candidates = BFMATCH.knnMatch(desc2,desc1,k=K_NEAREST)
-    matches_backward = []
-    #n_not_first_match_backward = 0
-    for knnlist in match_candidates:
-        matches_backward.append(knnlist[0])
-    """
-        for n,m in enumerate(knnlist):
-            if _are_close(kps1[m.trainIdx],kps2[m.queryIdx],MATCH_PROXIMITY_IN_PIXELS):
-                matches_backward.append(m)
-                if n > 0:
-                    n_not_first_match_backward += 1
-                break   # only pick first match that passes proximity test (closest in descriptor space)
+        if not proximity:
+            for knnlist in match_candidates_forward:
+                matches_forward.append(knnlist[0])      
+            return matches_forward
+        else:   # do proximity
+            for knnlist in match_candidates_forward:
+                m = knnlist[0]
+                if _are_close(kps1[m.queryIdx],kps2[m.trainIdx],MATCH_PROXIMITY_IN_PIXELS):
+                    matches_forward.append(m)
+            return matches_forward
 
-    n_backward = len(matches_backward)
-    """
+    else:    # do cross-check
 
-    # cross-check forward and backward match lists
-    matches = []
-    for mf in matches_forward:
-        for mb in matches_backward:
-            if mf.trainIdx == mb.queryIdx and mf.queryIdx == mb.trainIdx:
-            #if mf.trainIdx == mb.queryIdx:    # incorrect test - need to check both ways
-                matches.append(mf)
-                matches_backward.remove(mb)    # unique matching only
-                break
+        match_candidates_backward = BFMATCH.knnMatch(desc2,desc1,k=K_NEAREST)
+        matches_backward = []
 
-    #return matches, n_forward, n_backward, n_not_first_match_forward, n_not_first_match_backward
-    return matches
+        if not proximity:
+            for knnlist in match_candidates_forward:
+                matches_forward.append(knnlist[0])
+            for knnlist in match_candidates_backward:
+                matches_backward.append(knnlist[0])
+            matches = []
+            for mf in matches_forward:
+                for mb in matches_backward:
+                    if mf.trainIdx == mb.queryIdx and mf.queryIdx == mb.trainIdx:
+                    #if mf.trainIdx == mb.queryIdx:    # incorrect test - need to check both ways
+                        matches.append(mf)
+                        matches_backward.remove(mb)    # unique matching only
+                        break
+            return matches
 
+        else:   # do proximity
+            for knnlist in match_candidates_forward:
+                m = knnlist[0]
+                if _are_close(kps1[m.queryIdx],kps2[m.trainIdx],MATCH_PROXIMITY_IN_PIXELS):
+                    matches_forward.append(m)
+            for knnlist in match_candidates_backward:
+                m = knnlist[0]
+                if _are_close(kps2[m.queryIdx],kps1[m.trainIdx],MATCH_PROXIMITY_IN_PIXELS):
+                    matches_backward.append(m)
+
+            matches = []
+    
+            for mf in matches_forward:
+                for mb in matches_backward:
+                    if mf.trainIdx == mb.queryIdx and mf.queryIdx == mb.trainIdx:
+                    #if mf.trainIdx == mb.queryIdx:    # incorrect test - need to check both ways
+                        matches.append(mf)
+                        matches_backward.remove(mb)    # unique matching only
+                        break
+
+            return matches
 
 # read args
 parser = argparse.ArgumentParser()
@@ -122,20 +138,24 @@ im2 = cv2.imread(args.image_file2,0)
 # detect keypoints and descriptors
 kps1,kps2,desc1,desc2 = do_keypoint_detection(im1,im2,feature_detector)
 
-# find matches with built-in cross-check
-matches_cc = do_non_knn_match(kps1,kps2,desc1,desc2)
+# test 1: no cross-check, no proximity test
+matches_match = do_non_knn_match(kps1,kps2,desc1,desc2,False,False)
+matches_knn = do_knn_match(kps1,kps2,desc1,desc2,False,False)
+print("No cross-check, no proximity test: .match(): {0}, .kNNmatch(): {1}".format(len(matches_match),len(matches_knn)))
 
-# find matches
-#matches_knn, n_forward, n_backward, n_not_first_match_forward, n_not_first_match_backward = do_knn_match(kps1,kps2,desc1,desc2)
-matches_knn = do_knn_match(kps1,kps2,desc1,desc2)
+# test 2: no cross-check, yes proximity test:
+matches_match = do_non_knn_match(kps1,kps2,desc1,desc2,False,True)
+matches_knn = do_knn_match(kps1,kps2,desc1,desc2,False,True)
+print("No cross-check, yes proximity test: .match(): {0}, .kNNmatch(): {1}".format(len(matches_match),len(matches_knn)))
 
-# report
-print("Built-in CC matches: {0}; Manual CC matches: {1}".format(len(matches_cc),len(matches_knn)))
+# test 3: yes corss-check, no proximity test:
+matches_match = do_non_knn_match(kps1,kps2,desc1,desc2,True,False)
+matches_knn = do_knn_match(kps1,kps2,desc1,desc2,True,False)
+print("Yes cross-check, no proximity test: .match(): {0}, .kNNmatch(): {1}".format(len(matches_match),len(matches_knn)))
 
-#matches_cc_set = set(matches_cc)
-#matches_knn_set = set(matches_knn)
-#matches_cc_only = matches_cc_set.difference(matches_knn_set)
-#matches_knn_only = matches_knn_set.difference(matches_cc_set)
-#print("Matches only in CC: {0}; Matches only in kNN: {1}".format(len(matches_cc_only),len(matches_knn_only)))
+# test 4: yes corss-check, yes proximity test:
+matches_match = do_non_knn_match(kps1,kps2,desc1,desc2,True,True)
+matches_knn = do_knn_match(kps1,kps2,desc1,desc2,True,True)
+print("Yes cross-check, yes proximity test: .match(): {0}, .kNNmatch(): {1}".format(len(matches_match),len(matches_knn)))
 
 print("Finished")
