@@ -1,0 +1,7 @@
+#-118.258, 34.003, -118.280, 34.015 # New building in Los Angeles
+#-117.333, 34.033, -117.358, 33.993 # New buildings in Riverside
+#-117.388, 34.097, -117.360, 34.097 # Warehouses demolished, San Bernadino
+#-117.637, 34.102, -117.637, 34.07 # Initial constr. on new hospital wing, Upland
+# -117.205, 32.732, -117.235, 32.722 # New terminal at San Diego Airport
+#-118.411, 33.943, -118.382, 33.946  # New runway, LAX
+#-118.292, 33.830, -118.320, 33.830 # New hospital in Torrance 2
