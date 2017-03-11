@@ -230,7 +230,7 @@ def detect_change(im1_file, im2_file, RelDir, output_dir,**kwparams):
     IMAGE_WIDTH = im1.shape[1]
     #file1 = im1_file.split(RelDir+'/')[1]
     #file2 = im2_file.split(RelDir+'/')[1]
-    file_base = im2_file.split('-')[0]
+    file_base = im2_file.split(bulk_wrapper.SPLIT_STRING)[0]
     date1, date2 = bulk_wrapper.get_dates(im1_file,im2_file)
     save_image_filename = bulk_wrapper.generate_save_name(
         file_base+'-'+date1+date2,**kwparams)
@@ -248,6 +248,7 @@ def detect_change(im1_file, im2_file, RelDir, output_dir,**kwparams):
         kps2,desc2 = KAZE.detectAndCompute(im2,None)
     print 'Found {0} kps in im1'.format(len(kps1))
     print 'Found {0} kps in im2'.format(len(kps2))
+    #pdb.set_trace()
 #index_parameters = dict(algorithm = FLANN_KDTREE_INDEX, trees = FLANN_TREE_NUMBER)
 #search_parameters = dict(checks=FLANN_SEARCH_DEPTH)
 #FLANN = cv2.FlannBasedMatcher(index_parameters,search_parameters)
@@ -256,14 +257,17 @@ def detect_change(im1_file, im2_file, RelDir, output_dir,**kwparams):
 #match_candidates = FLANN.match(desc1,desc2)
 #match_candidates = BFMATCH.match(desc1,desc2)
 # Use this instead for relaxed matching:
-    match_candidates = BFMATCH.knnMatch(desc1,desc2,k=KNEAREST)
+    if desc1 is not None and desc2 is not None:
+        match_candidates = BFMATCH.knnMatch(desc1,desc2,k=KNEAREST)
+    else:
+        match_candidates = []
     print 'Found {0} match candidates...'.format(len(match_candidates))
 
     # calculate proximity limit
-    top_match_candidates = [kNNlist[0] for kNNlist in match_candidates]
-    offsets = _calculate_offsets_between_matches(kps1,kps2,
-                                            top_match_candidates,IMAGE_WIDTH)
     if CALCULATE_PROXIMITY_LIMIT == True:
+        top_match_candidates = [kNNlist[0] for kNNlist in match_candidates]
+        offsets = _calculate_offsets_between_matches(kps1,kps2,
+                                            top_match_candidates,IMAGE_WIDTH)
         proximity_limit = _calculate_proximity_threshold(offsets,
                                 MATCH_PROXIMITY_IN_PIXELS)[0]
     else:
@@ -274,6 +278,7 @@ def detect_change(im1_file, im2_file, RelDir, output_dir,**kwparams):
     matches_backward = []
 
     if HOMOGRAPHY:
+        top_match_candidates = [kNNlist[0] for kNNlist in match_candidates]
         H, mask = _calculate_homography(top_match_candidates,kps1,kps2)
         print 'Estimated homography transformation:'
         print H
@@ -330,7 +335,11 @@ def detect_change(im1_file, im2_file, RelDir, output_dir,**kwparams):
             matches = list(matches_backward)
     """        
     if TRUE_CROSS_CHECK:
-        match_candidates_backwards = BFMATCH.knnMatch(desc2,desc1,k=KNEAREST)
+        if desc1 is not None and desc2 is not None:
+            match_candidates_backwards = BFMATCH.knnMatch(
+                desc2,desc1,k=KNEAREST)
+        else:
+            match_candidates_backwards = []
         for knnlist in match_candidates_backwards:
             for m in knnlist:
                 if _are_close(kps1[m.trainIdx],kps2[m.queryIdx],
@@ -383,12 +392,12 @@ def detect_change(im1_file, im2_file, RelDir, output_dir,**kwparams):
 # first do forward direction
     kps2_not_matched = set(kps2) - set(kps2_matched)
     kps2_changed = []
-    kps2_local_histogram = np.zeros((N_kps2,),dtype=np.int)
+    #kps2_local_histogram = np.zeros((N_kps2,),dtype=np.int)
 
     for kp in kps2_not_matched:
         local_kps = filter(lambda x: _are_close(kp,x,MATCH_NEIGHBORHOOD_IN_PIXELS),kps2)
         local_matches = filter(lambda x: _are_close(kp,x,MATCH_NEIGHBORHOOD_IN_PIXELS),kps2_matched)
-        kps2_local_histogram[len(local_kps)] += 1    
+        #kps2_local_histogram[len(local_kps)] += 1    
 
     # do statistical test for each un-matched keypoint
         if STATS_TEST == 'PBYKPRATE':
@@ -411,12 +420,12 @@ def detect_change(im1_file, im2_file, RelDir, output_dir,**kwparams):
 # repeat above for backward direction
     kps1_not_matched = set(kps1) - set(kps1_matched)
     kps1_changed = []
-    kps1_local_histogram = np.zeros((N_kps1,),dtype=np.int)
+    #kps1_local_histogram = np.zeros((N_kps1,),dtype=np.int)
 
     for kp in kps1_not_matched:
         local_kps = filter(lambda x: _are_close(kp,x,MATCH_NEIGHBORHOOD_IN_PIXELS),kps1)
         local_matches = filter(lambda x: _are_close(kp,x,MATCH_NEIGHBORHOOD_IN_PIXELS),kps1_matched)
-        kps1_local_histogram[len(local_kps)] += 1    
+        #kps1_local_histogram[len(local_kps)] += 1    
 
     # do statistical test for each un-matched keypoint
         if STATS_TEST == 'PBYKPRATE':
@@ -443,7 +452,7 @@ def detect_change(im1_file, im2_file, RelDir, output_dir,**kwparams):
                       color=change_color_forward,flags=0)
     cv2.drawKeypoints(im2_out,kps1_changed,im2_out,
                       color=change_color_backward,flags=0)
-
+    """
 # calculate histogram and plot
 #match_offsets = _calculate_offsets_between_matches(kps1,kps2,match_candidates)
     offsets_histogram = _make_offsets_histogram(offsets,proximity_limit,
@@ -452,7 +461,7 @@ def detect_change(im1_file, im2_file, RelDir, output_dir,**kwparams):
     hist_plots = np.concatenate((offsets_histogram,local_keypoint_histogram),axis=1)
     #hist_plots = np.concatenate((offsets_histogram,
      #                        255*np.ones(offsets_histogram.shape)),axis=1)
-
+"""
 # make label box
     text_box_height = 10 + 20 * 7
     text_box = 255 * np.ones((text_box_height,2*IMAGE_WIDTH,3),np.uint8)
@@ -494,7 +503,8 @@ def detect_change(im1_file, im2_file, RelDir, output_dir,**kwparams):
     # join label to bottom of image pair and save
     im_A = np.concatenate((im1_color,im2_out),axis=1)
     im_B = np.concatenate((im_A,text_box),axis=0)
-    im_C = np.concatenate((im_B,hist_plots),axis=0)
+    #im_C = np.concatenate((im_B,hist_plots),axis=0)
+    im_C = im_B
     print save_image_filename
     cv2.imwrite(os.path.join(output_dir,save_image_filename),im_C)
 

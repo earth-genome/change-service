@@ -15,13 +15,16 @@ import os
 YEAR1 = 2010
 YEAR2 = 2012
 COUNTY_INDEX = 25
-NUMBER_OF_LOCATIONS_PER_COUNTY = 10
+NUMBER_OF_LOCATIONS_PER_COUNTY = 8
 # for 1m res
 #URL_PREFIX = 'waterapp'
 #DIM = 256
 # for dim1000
+#URL_PREFIX = 'genome'
+#DIM = 1000
+# for dim500
 URL_PREFIX = 'genome'
-DIM = 1000
+DIM = 500
 
 # api info
 API_BASE_COORDS = 'http://genome.enviro-service.appspot.com/land/validation'

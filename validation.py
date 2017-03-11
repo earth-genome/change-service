@@ -2,7 +2,7 @@
 
 Assumptions:
 
-Points labeled as change have pixel values [255,255,255] (white).
+Points labeled as change have pixel values [255,0,255] (pink).
 
 File names:
 Image pair: 'UniqueName-Year1.jpg', 'UniqueName-Year2.jpg'
@@ -34,7 +34,7 @@ import bulk_wrapper
 
 def validate(change_img,labeled_img):
     """Validate the change mask against a hand-labeled image.
-    Assumes the labeled pixels take value [255,255,255]. Returns one of:
+    Assumes the labeled pixels take value [255,0,255]. Returns one of:
      'true positive', 'true negative', 'false positive','false negative',
      'missed detection' (for the case of positive detections that don't
      intersect any labeled regions).
@@ -128,7 +128,66 @@ def tabulate(change_dir,labeled_dir):
     logfile.close()
     return
 
+def compute_stats(labeled_dir):
+    """Compute and print average area and std dev of areas of
+    labeled regions.
+    """
+    
+    # Use the pink for labeled images, the white for change images
+    PIXEL_MAX = 255
+    PIXEL_MIN = 0
+    PINK = [PIXEL_MAX,PIXEL_MIN,PIXEL_MAX]
+    WHITE = [PIXEL_MAX,PIXEL_MAX,PIXEL_MAX]
+
+    #COLOR = PINK
+    #FILE_EX = 'labeled.png'
+
+    COLOR = WHITE
+    FILE_EX = '.pgm'
+
+    imagenames = []
+    for dir_, _, files in os.walk(labeled_dir):
+        for filename in files:
+            if FILE_EX in filename:
+                imagenames.append(filename)
+                
+    areas = []
+    for i in imagenames:
+        labeled_img = cv2.imread(labeled_dir+'/'+i,1)
+        # convert img to binary
+        label_bin = np.zeros(labeled_img.shape[:2])
+        label_points = np.where(np.all(labeled_img==COLOR,axis=2))
+        label_bin[label_points] = 1
+
+        # only images with change
+        change_area = np.sum(label_bin)
+        tot_area = reduce(lambda x,y: x*y, label_bin.shape)
+        if change_area > 0:
+            frac_area = change_area/float(tot_area)
+            areas.append(frac_area)
+            print i
+            print 'Frac area: {:4f}'.format(frac_area)
+
+    if len(areas) == 0:
+        print 'nothing to see here'
+        return
+    print '\nFor {} images with change,\n' \
+        'the average fractional area with change is {:.4f},\n' \
+        'the std dev is {:4f},\n' \
+        'the min is {:4f}, and the max is {:4f}.'.format(len(areas),
+        np.mean(areas),np.std(areas),np.min(areas),np.max(areas))
+    return
+        
+        
+
 if __name__ == '__main__':
+    # last-minute hack for statistical analysis: Usage:
+    # python validation.py 'construction-labeled' 'stats'
+    if sys.argv[2] == 'stats':
+        compute_stats(sys.argv[1])
+        sys.exit(1)
+
+    # As was:
     try:
         change_dir, labeled_dir = sys.argv[1:3]
     except ValueError:
@@ -136,3 +195,5 @@ if __name__ == '__main__':
                  'and labeled images.')
     
     tabulate(change_dir,labeled_dir)
+    
+    

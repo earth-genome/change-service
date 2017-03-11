@@ -77,8 +77,8 @@ PARAMETERS = dict(FEATURES = 'KAZE',
                     MATCH_PROBABILITY_THRESHOLD = 1e-8,
                     CT_THRESHOLD_FRAC = .01,
                     CT_NBHD_SIZE = 120)
-#SPLIT_STRING = 'dim1000-'
-SPLIT_STRING = '-'
+SPLIT_STRING = 'dim1000-'
+#SPLIT_STRING = '-'
 INPUT_FILEEXT = '.png'
 #INPUT_FILEEXT = '.jpg'
 
@@ -111,6 +111,8 @@ def generate_save_name(base_name,**params):
         'thr{:.0e}'.format(params['MATCH_PROBABILITY_THRESHOLD'])])
     if params['KAZE_PARAMETER'] != 0.0003:
         save_name += 'KAZEpar'+str(params['KAZE_PARAMETER'])
+    if params['KNEAREST'] != 5:
+        save_name += '-kNN'+str(params['KNEAREST'])
     if params['MATCH_NEIGHBORHOOD_IN_PIXELS'] != 40:
         save_name += ('nbhd'+
                       str(params['MATCH_NEIGHBORHOOD_IN_PIXELS']))
@@ -152,7 +154,7 @@ def agglomerate(changepoints,total_kps,*file_data,**kwparams):
     try:
         imbb_color = cv2.imread(os.path.join(file_data[-1],
                     im2_file.split(INPUT_FILEEXT)[0]+'labeledbb.png'))
-    except IOError:
+    except (IOError, AttributeError):
         imbb_color = None
     image_shape = im2_color.shape[:-1]
     changepoints_image = np.zeros(image_shape,dtype=int)
@@ -164,10 +166,11 @@ def agglomerate(changepoints,total_kps,*file_data,**kwparams):
     alpha_mask = np.ones(image_shape,dtype=int)*OPACITY
     alpha_mask[ct_image > ct_threshold] = FULL_OPACITY
     agg_im = np.dstack((im2_color,alpha_mask))
-    if imbb_color is not None:
-        aggbb_im = np.dstack((imbb_color,alpha_mask))
-    else:
-        aggbb_im = None
+    #if imbb_color is not None:
+    #    aggbb_im = np.dstack((imbb_color,alpha_mask))
+    #else:
+    #    aggbb_im = None
+    aggbb_im = None
     
     agg_binary = np.zeros(image_shape,dtype=int)
     agg_binary[ct_image > ct_threshold] = WHITE
@@ -191,13 +194,18 @@ def write_agg_images(agg_image,agg_bin,bb_image,aggbb_image,
     triptych = np.hstack((im1_masked,im2_masked,agg_image))
     cv2.imwrite(os.path.join(agg_dir,save_name+'.png'),triptych)
     cv2.imwrite(os.path.join(agg_dir,save_name+'.pgm'),agg_bin)
+    # added changeprops for county tests:
+    """if np.sum(agg_bin) > 0:
+        cv2.imwrite(os.path.join(agg_dir.split('agged')[0]+'changeprops',
+                                  save_name+'.png'),triptych)
+    """
     if bb_image is not None:
         bb_masked = np.dstack((bb_image,blank_mask))
         triptychbb = np.hstack((im1_masked,bb_masked,agg_image))
-        triptychaggbb = np.hstack((im1_masked,im2_masked,aggbb_image))
+        #triptychaggbb = np.hstack((im1_masked,im2_masked,aggbb_image))
         cv2.imwrite(os.path.join(agg_dir,save_name+'bb.png'),triptychbb)
-        cv2.imwrite(os.path.join(agg_dir,save_name+'bbagg.png'),
-                     triptychaggbb)
+        #cv2.imwrite(os.path.join(agg_dir,save_name+'bbagg.png'),
+        #             triptychaggbb)
     return
 
 if __name__ == '__main__':
@@ -236,6 +244,11 @@ if __name__ == '__main__':
     agg_dir = (generate_save_name(pairs_basename,**params) + '-agged')
     if not os.path.exists(agg_dir):
         os.makedirs(agg_dir)
+    # add changeprops_dir for county tests
+    """changeprops_dir = agg_dir.split('agged')[0]+'changeprops'
+    if not os.path.exists(changeprops_dir):
+        os.makedirs(changeprops_dir)
+    """
     with open(agg_dir+'/'+agg_dir+'-valid.log','a') as logfile:
         logfile.write('bulk_wrapper.py {}.\n'.format(time.strftime('%c')))
         logfile.write('Change parameters:\n')
@@ -252,7 +265,10 @@ if __name__ == '__main__':
         changepoints, total_kps = bulk_detect.detect_change(*file_data,
                                                 **params)
         file_data.pop()
-        file_data += [agg_dir,args.labeled_dir+'bb']
+        if args.labeled_dir is not None:
+            file_data += [agg_dir,args.labeled_dir+'bb']
+        else:
+            file_data += [agg_dir,None]
         agglomerate(changepoints,total_kps,*file_data,**params)
     if args.labeled_dir is not None:
         validation.tabulate(agg_dir,args.labeled_dir)

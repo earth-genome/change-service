@@ -11,7 +11,7 @@
 -117.607, 33.464, -117.607, 33.483 # New Target, San Clemente
 -119.700, 36.840, -119.751, 36.840 # Initial construction on new Walmart, Fresno
 -117.169, 33.615, -117.140, 33.615 # New hospital in Murrieta
--117.106, 33.481, -117.106, 33.515 # New hospital in Torrance
+-117.106, 33.481, -117.106, 33.515 # New hospital in Temecula
 -117.575, 34.115, -117.575, 34.135 # New housing development, San Bernadino
 -117.3355, 34.026, -117.303, 34.028 # New sports complex in Riverside
 -117.440, 34.549, -117.440, 34.570 # New PV array in Adelanto
