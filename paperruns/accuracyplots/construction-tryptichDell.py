@@ -16,7 +16,7 @@ import pdb
 
 import constructionresults as cr
 
-dataruns = [cr.KAZEkNN5,cr.KAZEkNN1,cr.SIFTkNN5,cr.SIFTkNN1]
+dataruns = [cr.Dell]
 totalaccuracy = [[d['tot'] for d in dataruns]]
 posratenegrate = [[d['pos'] for d in dataruns],[d['neg'] for d in dataruns]]
 tpprop = [[d['tpprop'] for d in dataruns]]
@@ -27,8 +27,8 @@ maxthresh = max([t for d in dataruns for t in d['thresh']])
 
 def commonplot(ax,data,savename,title,xlabel,ylabel,xlim=None,ylim=None):
     """Create an ad-hoc 2D plot of assembled data."""
-    colors =  ['b','g','r','k']
-    markers = ['^','s','o','*']
+    colors =  ['k']
+    markers = ['*']
     #markers = [None for _ in dataruns]
     #pdb.set_trace()
     for trio in data:
@@ -47,7 +47,7 @@ def commonplot(ax,data,savename,title,xlabel,ylabel,xlim=None,ylim=None):
     for tick in ax.yaxis.get_major_ticks():
         tick.label.set_fontsize(14)
     if xlabel is not None:
-        ax.set_xlabel(r"Probability threshold ($\log\,\tilde\varepsilon$)",
+        ax.set_xlabel(r"Probability threshold ($\log\,\varepsilon$)",
                   fontsize=20)
     ax.set_title(title,fontsize=20)
     plt.savefig(savename,bbox_inches='tight')
@@ -109,7 +109,7 @@ def tpplot(ax,data,tpfd,savename,title,xlabel,ylabel,xlim=None,ylim=None):
     for tick in ax.yaxis.get_major_ticks():
         tick.label.set_fontsize(14)
     if xlabel is not None:
-        ax.set_xlabel(r"Probability threshold ($\log\,\tilde\varepsilon$)",
+        ax.set_xlabel(r"Probability threshold ($\log\,\varepsilon$)",
                   fontsize=20)
     ax.set_title(title,fontsize=20)
 
@@ -136,7 +136,7 @@ if __name__ == '__main__':
                title='Total accuracy',
                xlabel=None,ylabel='%',xlim=[maxthresh,minthresh],
                ylim=[40,80])
-    ax.legend(['KAZE-kNN5','KAZE-kNN1','SIFT-kNN5','SIFT-kNN1'],loc=1)
+    ax.legend(['Dellinger - SIFT'],loc=1)
     plt.savefig('TA.png',bbox_inches='tight')
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -168,7 +168,7 @@ if __name__ == '__main__':
     tpproppng = np.vstack([tpproppng,
                          np.ones((labelheight,tpproppng.shape[1],4))])
     trip = np.hstack([TApng,posnegpng,tpproppng])
-    plt.imsave('triptych-construction.png',trip)
+    plt.imsave('triptych-constructionDell.png',trip)
 
     
 
